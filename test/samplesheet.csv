@@ -1,0 +1,5 @@
+sample_id,fastq_1,fastq_2,condition
+test_pos1,/Users/ekin/rnaseq-nextflow-pipeline/test/test_pos1_1.fastq.gz,/Users/ekin/rnaseq-nextflow-pipeline/test/test_pos1_2.fastq.gz,positive
+test_pos2,/Users/ekin/rnaseq-nextflow-pipeline/test/test_pos2_1.fastq.gz,/Users/ekin/rnaseq-nextflow-pipeline/test/test_pos2_2.fastq.gz,positive
+test_neg1,/Users/ekin/rnaseq-nextflow-pipeline/test/test_neg1_1.fastq.gz,/Users/ekin/rnaseq-nextflow-pipeline/test/test_neg1_2.fastq.gz,negative
+test_neg2,/Users/ekin/rnaseq-nextflow-pipeline/test/test_neg2_1.fastq.gz,/Users/ekin/rnaseq-nextflow-pipeline/test/test_neg2_2.fastq.gz,negative
