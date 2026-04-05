@@ -122,11 +122,19 @@ results/
 
 ## Design Decisions
 
-- **HISAT2 over STAR** — runs on 8GB RAM. STAR requires 32GB for the human genome index. Accessible on any laptop or HPC node.
+- **HISAT2 over STAR** — HISAT2's graph FM index fits in ~8GB RAM vs STAR's ~32GB for the human genome. Both are splice-aware aligners with comparable accuracy for well-annotated genomes; HISAT2 was chosen to keep the pipeline runnable on standard hardware.
+- **featureCounts over htseq-count** — faster on multi-sample runs (native multithreading) and produces identical counts for standard gene-level quantification.
 - **BioContainers** — published containers from the Bioconda ecosystem. No custom Dockerfiles to maintain.
 - **Docker and Singularity** — `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
-- **Configurable contrast** — `--ref_condition` sets the DESeq2 reference level. `--strandedness` adapts featureCounts to the library prep protocol.
+- **Reverse-stranded default** — `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
+- **Configurable contrast** — `--ref_condition` sets the DESeq2 reference level. Defaults to "untreated" for the airway dataset.
 - **Test profile** — synthetic 50-gene genome with reads sampled from the reference sequence. Verifies the full pipeline in ~2 minutes without downloading real data.
+
+## Limitations
+
+- **2 samples per condition in the demo** — underpowered for reliable DE. The DESeq2 step runs and produces output, but with n=2 the results are illustrative, not statistically robust. Proper analysis requires ≥3 replicates per condition.
+- **No real data results yet** — the pipeline has been verified on synthetic test data and is awaiting execution on the UEA HPC (Hali) with the full airway dataset.
+- **No STAR option** — only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
 
 ## Licence
 
