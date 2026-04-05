@@ -3,20 +3,23 @@
 nextflow.enable.dsl = 2
 
 /*
- * RNA-seq Pipeline
- * FastQC → fastp → HISAT2 → featureCounts → DESeq2 → MultiQC
+ * Bulk RNA-seq Pipeline
+ * FASTQ → FastQC → fastp → HISAT2 → samtools → featureCounts → DESeq2 → MultiQC
+ *
+ * Processes paired-end RNA-seq reads through quality control, alignment to a
+ * reference genome, gene-level quantification, and basic differential expression.
  */
 
-params.samplesheet = "${projectDir}/assets/samplesheet.csv"
+params.samplesheet  = "${projectDir}/assets/samplesheet.csv"
 params.genome_index = null
-params.gtf = null
-params.outdir = "results"
-params.strandedness = 2  // 0=unstranded, 1=forward, 2=reverse
-params.ref_condition = "untreated"  // DESeq2 reference level
+params.gtf          = null
+params.outdir       = "results"
+params.strandedness = 2           // featureCounts: 0=unstranded, 1=forward, 2=reverse
+params.ref_condition = "untreated" // DESeq2 reference level for contrast
 
-// Validate required params
-if (!params.genome_index) { error "Provide --genome_index (path to HISAT2 index prefix)" }
-if (!params.gtf) { error "Provide --gtf (path to gene annotation GTF)" }
+// Validate
+if (!params.genome_index) { error "Provide --genome_index (HISAT2 index prefix)" }
+if (!params.gtf)          { error "Provide --gtf (gene annotation GTF)" }
 
 /*
  * Read samplesheet: sample_id, fastq_1, fastq_2, condition
@@ -93,7 +96,7 @@ process HISAT2_ALIGN {
     path("${sample_id}_hisat2.log"), emit: log
 
     script:
-    def index_prefix = index_files[0].toString().replaceAll(/\.\d+\.ht2$/, '')
+    def index_prefix = index_files[0].toString().replaceFirst(/\.\d+\.ht2[l]?$/, '')
     """
     hisat2 \
         -x ${index_prefix} \
@@ -118,7 +121,7 @@ process SAMTOOLS_SORT {
     tuple val(sample_id), path(sam), val(condition)
 
     output:
-    tuple val(sample_id), path("${sample_id}.bam"), val(condition), emit: bam
+    tuple val(sample_id), path("${sample_id}.bam"), path("${sample_id}.bam.bai"), val(condition), emit: bam
 
     script:
     """
@@ -292,7 +295,7 @@ workflow {
     SAMTOOLS_SORT(HISAT2_ALIGN.out.sam)
 
     // Count — collect all BAMs
-    all_bams = SAMTOOLS_SORT.out.bam.map { id, bam, cond -> bam }.collect()
+    all_bams = SAMTOOLS_SORT.out.bam.map { id, bam, bai, cond -> bam }.collect()
     gtf_ch = Channel.fromPath(params.gtf)
     FEATURECOUNTS(all_bams, gtf_ch)
 

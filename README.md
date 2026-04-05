@@ -4,9 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Nextflow](https://img.shields.io/badge/Nextflow-%E2%89%A524.0-brightgreen)](https://www.nextflow.io/)
 
-End-to-end bulk RNA-seq pipeline in Nextflow DSL2: raw FASTQ reads through quality control, adapter trimming, genome alignment, gene quantification, differential expression, and aggregated QC reporting. Every step runs in its own Docker container.
+Bulk RNA-seq pipeline in Nextflow DSL2. Takes paired-end FASTQ reads from raw sequencing output through to differential expression results — QC, trimming, alignment, counting, and DESeq2 — with each step containerised via Docker or Singularity.
 
-Demonstrated on the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625) airway smooth muscle dataset — dexamethasone-treated vs untreated human airway cells. For covariate-adjusted analysis on a larger COVID-19 cohort, see [bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
+Applied to the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625) airway smooth muscle dataset (dexamethasone vs untreated, GEO [GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html). For the full covariate-adjusted analysis on a COVID-19 cohort, see [bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
 
 ## Workflow
 
@@ -49,12 +49,10 @@ FASTQ (paired-end)
 
 All containers sourced from [BioContainers](https://biocontainers.pro/).
 
-## Dataset
+## Samples
 
-**Himes et al. (2014)** — RNA-seq of human airway smooth muscle cells treated with dexamethasone (a glucocorticoid anti-inflammatory). GEO accession [GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778). This dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html).
-
-| Sample | Accession | Condition | Donor |
-|--------|-----------|-----------|-------|
+| Sample | SRA | Condition | Donor |
+|--------|-----|-----------|-------|
 | N61311_untreated | SRR1039508 | untreated | N61311 |
 | N61311_Dex | SRR1039509 | dexamethasone | N61311 |
 | N052611_untreated | SRR1039512 | untreated | N052611 |
@@ -124,11 +122,11 @@ results/
 
 ## Design Decisions
 
-- **HISAT2 over STAR** — runs on 8GB RAM. STAR requires 32GB for the human genome. Accessible on any machine.
-- **BioContainers** — published, maintained Docker containers. No custom builds.
-- **Configurable reference level** — `--ref_condition` sets the DESeq2 baseline. Works with any experimental design.
-- **Adaptive gene filter** — automatically adjusts minimum count threshold based on library size (stringent for real data, permissive for test data).
-- **Test profile** — synthetic 50-gene genome with genome-sampled reads. Verifies the full pipeline in ~2 minutes.
+- **HISAT2 over STAR** — runs on 8GB RAM. STAR requires 32GB for the human genome index. Accessible on any laptop or HPC node.
+- **BioContainers** — published containers from the Bioconda ecosystem. No custom Dockerfiles to maintain.
+- **Docker and Singularity** — `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
+- **Configurable contrast** — `--ref_condition` sets the DESeq2 reference level. `--strandedness` adapts featureCounts to the library prep protocol.
+- **Test profile** — synthetic 50-gene genome with reads sampled from the reference sequence. Verifies the full pipeline in ~2 minutes without downloading real data.
 
 ## Licence
 
