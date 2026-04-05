@@ -12,6 +12,7 @@ params.genome_index = null
 params.gtf = null
 params.outdir = "results"
 params.strandedness = 2  // 0=unstranded, 1=forward, 2=reverse
+params.ref_condition = "untreated"  // DESeq2 reference level
 
 // Validate required params
 if (!params.genome_index) { error "Provide --genome_index (path to HISAT2 index prefix)" }
@@ -191,20 +192,19 @@ process DESEQ2 {
     ss <- ss[match(colnames(counts), ss\$sample_id), ]
     stopifnot(all(colnames(counts) == ss\$sample_id))
 
+    # Filter low-count genes (adaptive: require counts in at least half the samples)
+    min_count <- ifelse(max(colSums(counts)) > 1e6, 10, 1)
+    min_samples <- max(2, floor(ncol(counts) / 2))
+    keep <- rowSums(counts >= min_count) >= min_samples
+    counts <- counts[keep, , drop = FALSE]
+    cat(sprintf("Genes passing filter: %d (min_count=%d, min_samples=%d)\\n", sum(keep), min_count, min_samples))
+
     # DESeq2
     dds <- DESeqDataSetFromMatrix(counts, ss, design = ~ condition)
-    dds\$condition <- relevel(dds\$condition, ref = "negative")
-
-    # Filter low-count genes (keep genes with at least 1 count in 2+ samples)
-    keep <- rowSums(counts >= 1) >= 2
-    counts <- counts[keep, , drop = FALSE]
-    cat(sprintf("Genes passing filter: %d / %d\\n", sum(keep), length(keep)))
-
-    dds <- DESeqDataSetFromMatrix(counts, ss, design = ~ condition)
-    dds\$condition <- relevel(dds\$condition, ref = "negative")
+    dds\$condition <- relevel(dds\$condition, ref = "${params.ref_condition}")
 
     tryCatch({
-        dds <- DESeq(dds, sfType = "poscounts")
+        dds <- DESeq(dds)
     }, error = function(e) {
         # Fallback for small/test datasets where dispersion fitting fails
         cat("Note: using gene-wise dispersion estimates (expected for small test data)\\n")
@@ -213,7 +213,11 @@ process DESEQ2 {
         dispersions(dds) <<- mcols(dds)\$dispGeneEst
         dds <<- nbinomWaldTest(dds)
     })
-    res <- results(dds, contrast = c("condition", "positive", "negative"), alpha = 0.05)
+    # Get the non-reference condition level for contrast
+    cond_levels <- levels(dds\$condition)
+    treat_level <- cond_levels[cond_levels != "${params.ref_condition}"][1]
+    cat(sprintf("Contrast: %s vs %s\\n", treat_level, "${params.ref_condition}"))
+    res <- results(dds, contrast = c("condition", treat_level, "${params.ref_condition}"), alpha = 0.05)
     res <- res[order(res\$padj), ]
 
     # Save results

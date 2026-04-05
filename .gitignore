@@ -3,3 +3,6 @@ results/
 .nextflow/
 .nextflow.log*
 *.html
+data/
+genome/
+*.sra

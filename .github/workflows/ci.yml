@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Nextflow
+        run: |
+          curl -s https://get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+
+      - name: Generate test data
+        run: python test/create_test_data.py
+
+      - name: Build test HISAT2 index
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE/test:/data" \
+            quay.io/biocontainers/hisat2:2.2.1--hdbdd923_6 \
+            hisat2-build -q /data/genome.fa /data/genome
+
+      - name: Run pipeline (test profile)
+        run: |
+          nextflow run main.nf \
+            -profile test,docker \
+            --genome_index "$GITHUB_WORKSPACE/test/genome" \
+            --gtf "$GITHUB_WORKSPACE/test/genes.gtf"
+
+      - name: Verify outputs
+        run: |
+          test -f results/counts/gene_counts.txt
+          test -f results/deseq2/deseq2_results.csv
+          test -f results/deseq2/volcano_plot.png
+          test -f results/deseq2/pca_plot.png
+          test -f results/multiqc/multiqc_report.html
+          echo "All outputs verified"

@@ -1,7 +1,5 @@
 sample_id,fastq_1,fastq_2,condition
-SRR11886868,data/SRR11886868_1.fastq.gz,data/SRR11886868_2.fastq.gz,positive
-SRR11886869,data/SRR11886869_1.fastq.gz,data/SRR11886869_2.fastq.gz,positive
-SRR11886870,data/SRR11886870_1.fastq.gz,data/SRR11886870_2.fastq.gz,positive
-SRR11886871,data/SRR11886871_1.fastq.gz,data/SRR11886871_2.fastq.gz,negative
-SRR11886872,data/SRR11886872_1.fastq.gz,data/SRR11886872_2.fastq.gz,negative
-SRR11886873,data/SRR11886873_1.fastq.gz,data/SRR11886873_2.fastq.gz,negative
+SRR1039508,data/SRR1039508_1.fastq.gz,data/SRR1039508_2.fastq.gz,untreated
+SRR1039509,data/SRR1039509_1.fastq.gz,data/SRR1039509_2.fastq.gz,dexamethasone
+SRR1039512,data/SRR1039512_1.fastq.gz,data/SRR1039512_2.fastq.gz,untreated
+SRR1039513,data/SRR1039513_1.fastq.gz,data/SRR1039513_2.fastq.gz,dexamethasone
