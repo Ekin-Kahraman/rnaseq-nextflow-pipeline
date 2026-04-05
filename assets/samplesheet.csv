@@ -1,5 +1,3 @@
 sample_id,fastq_1,fastq_2,condition
 SRR1039508,data/SRR1039508_1.fastq.gz,data/SRR1039508_2.fastq.gz,untreated
 SRR1039509,data/SRR1039509_1.fastq.gz,data/SRR1039509_2.fastq.gz,dexamethasone
-SRR1039512,data/SRR1039512_1.fastq.gz,data/SRR1039512_2.fastq.gz,untreated
-SRR1039513,data/SRR1039513_1.fastq.gz,data/SRR1039513_2.fastq.gz,dexamethasone
