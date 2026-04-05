@@ -32,6 +32,10 @@ Channel
 
 /*
  * STEP 1: FastQC on raw reads
+ *
+ * Run before trimming to capture adapter contamination rates and
+ * per-base quality profiles. These metrics inform whether fastp
+ * parameters need adjusting for a given library.
  */
 process FASTQC_RAW {
     tag "$sample_id"
@@ -53,6 +57,11 @@ process FASTQC_RAW {
 
 /*
  * STEP 2: Trim with fastp
+ *
+ * fastp over Trimmomatic: single binary handles adapter detection,
+ * quality trimming, and polyG tail removal. No external adapter file
+ * needed — fastp infers adapters from read overlap in PE mode.
+ * Phred 20 + min length 36 follows the Himes et al. original analysis.
  */
 process FASTP {
     tag "$sample_id"
@@ -81,6 +90,11 @@ process FASTP {
 
 /*
  * STEP 3: Align with HISAT2
+ *
+ * HISAT2 uses a graph FM index that fits in ~8GB RAM, vs STAR's
+ * ~32GB for the human genome. This makes the pipeline runnable on
+ * laptops and standard HPC nodes without high-memory allocation.
+ * --dta flag enables downstream transcript assembly compatibility.
  */
 process HISAT2_ALIGN {
     tag "$sample_id"
@@ -132,6 +146,11 @@ process SAMTOOLS_SORT {
 
 /*
  * STEP 4: Count with featureCounts
+ *
+ * Gene-level quantification using gene_name (not gene_id) for
+ * human-readable output. -s flag is configurable because library
+ * strandedness varies by prep kit: dUTP protocols are reverse-stranded
+ * (s=2), while older protocols may be unstranded (s=0).
  */
 process FEATURECOUNTS {
     container 'quay.io/biocontainers/subread:2.0.6--he4a0461_2'
