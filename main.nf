@@ -148,9 +148,10 @@ process SAMTOOLS_SORT {
  * STEP 4: Count with featureCounts
  *
  * Gene-level quantification using gene_name (not gene_id) for
- * human-readable output. -s flag is configurable because library
- * strandedness varies by prep kit: dUTP protocols are reverse-stranded
- * (s=2), while older protocols may be unstranded (s=0).
+ * human-readable output. --countReadPairs counts fragments not
+ * individual reads (correct for PE data). -s flag is configurable
+ * because strandedness varies by library prep: dUTP protocols are
+ * reverse-stranded (s=2), older protocols may be unstranded (s=0).
  */
 process FEATURECOUNTS {
     container 'quay.io/biocontainers/subread:2.0.6--he4a0461_2'
@@ -170,7 +171,7 @@ process FEATURECOUNTS {
         -a ${gtf} \
         -o gene_counts.txt \
         -T 4 \
-        -p --countReadPairs \  # count fragments, not individual reads (PE data)
+        -p --countReadPairs \
         -s ${params.strandedness} \
         -t exon \
         -g gene_name \
