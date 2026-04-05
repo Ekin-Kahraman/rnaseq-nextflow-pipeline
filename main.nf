@@ -170,7 +170,7 @@ process FEATURECOUNTS {
         -a ${gtf} \
         -o gene_counts.txt \
         -T 4 \
-        -p --countReadPairs \
+        -p --countReadPairs \  # count fragments, not individual reads (PE data)
         -s ${params.strandedness} \
         -t exon \
         -g gene_name \
