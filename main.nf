@@ -10,12 +10,7 @@ nextflow.enable.dsl = 2
  * reference genome, gene-level quantification, and basic differential expression.
  */
 
-params.samplesheet  = "${projectDir}/assets/samplesheet.csv"
-params.genome_index = null
-params.gtf          = null
-params.outdir       = "results"
-params.strandedness = 2           // featureCounts: 0=unstranded, 1=forward, 2=reverse
-params.ref_condition = "untreated" // DESeq2 reference level for contrast
+// All parameter defaults are defined in nextflow.config
 
 // Validate
 if (!params.genome_index) { error "Provide --genome_index (HISAT2 index prefix)" }
@@ -51,7 +46,7 @@ process FASTQC_RAW {
 
     script:
     """
-    fastqc --threads 2 --quiet ${fastq1} ${fastq2}
+    fastqc --threads ${task.cpus} --quiet ${fastq1} ${fastq2}
     """
 }
 
@@ -81,7 +76,7 @@ process FASTP {
         -i ${fastq1} -I ${fastq2} \
         -o ${sample_id}_trimmed_R1.fastq.gz -O ${sample_id}_trimmed_R2.fastq.gz \
         --json ${sample_id}_fastp.json \
-        --thread 4 \
+        --thread ${task.cpus} \
         --detect_adapter_for_pe \
         --qualified_quality_phred 20 \
         --length_required 36
@@ -115,7 +110,7 @@ process HISAT2_ALIGN {
     hisat2 \
         -x ${index_prefix} \
         -1 ${fastq1} -2 ${fastq2} \
-        --threads 4 \
+        --threads ${task.cpus} \
         --summary-file ${sample_id}_hisat2.log \
         --new-summary \
         --dta \
@@ -139,7 +134,7 @@ process SAMTOOLS_SORT {
 
     script:
     """
-    samtools sort -@ 2 -o ${sample_id}.bam ${sam}
+    samtools sort -@ ${task.cpus} -o ${sample_id}.bam ${sam}
     samtools index ${sample_id}.bam
     """
 }
@@ -170,7 +165,7 @@ process FEATURECOUNTS {
     featureCounts \
         -a ${gtf} \
         -o gene_counts.txt \
-        -T 4 \
+        -T ${task.cpus} \
         -p --countReadPairs \
         -s ${params.strandedness} \
         -t exon \
