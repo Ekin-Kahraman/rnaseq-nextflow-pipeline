@@ -6,3 +6,6 @@ results/
 data/
 genome/
 *.sra
+__pycache__/
+*.pyc
+.DS_Store
