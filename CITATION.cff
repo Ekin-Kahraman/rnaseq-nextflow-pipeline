@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this pipeline, please cite this repository and the exact commit or release you used."
+title: "RNA-seq Nextflow Pipeline"
+type: software
+license: MIT
+version: "1.0.0"
+date-released: "2026-05-15"
+repository-code: "https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline"
+url: "https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline"
+abstract: "A reproducible Nextflow DSL2 RNA-seq workflow for paired-end FASTQ quality control, trimming, HISAT2 alignment, featureCounts quantification, DESeq2 differential expression, MultiQC reporting, and cloud-ready execution."
+keywords:
+  - bioinformatics
+  - RNA-seq
+  - Nextflow
+  - DESeq2
+  - MultiQC
+  - AWS Batch
+authors:
+  - family-names: "Kahraman"
+    given-names: "Ekin"
+    affiliation: "University of East Anglia"
+    email: "evk23umu@uea.ac.uk"
