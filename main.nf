@@ -12,19 +12,6 @@ nextflow.enable.dsl = 2
 
 // All parameter defaults are defined in nextflow.config
 
-// Validate
-if (!params.genome_index) { error "Provide --genome_index (HISAT2 index prefix)" }
-if (!params.gtf)          { error "Provide --gtf (gene annotation GTF)" }
-
-/*
- * Read samplesheet: sample_id, fastq_1, fastq_2, condition
- */
-Channel
-    .fromPath(params.samplesheet)
-    .splitCsv(header: true)
-    .map { row -> tuple(row.sample_id, file(row.fastq_1), file(row.fastq_2), row.condition) }
-    .set { reads_ch }
-
 /*
  * STEP 1: FastQC on raw reads
  *
@@ -296,6 +283,17 @@ process MULTIQC {
  * WORKFLOW
  */
 workflow {
+    if (!params.genome_index) { error "Provide --genome_index (HISAT2 index prefix)" }
+    if (!params.gtf)          { error "Provide --gtf (gene annotation GTF)" }
+
+    /*
+     * Read samplesheet: sample_id, fastq_1, fastq_2, condition
+     */
+    reads_ch = Channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)
+        .map { row -> tuple(row.sample_id, file(row.fastq_1), file(row.fastq_2), row.condition) }
+
     // Raw QC
     FASTQC_RAW(reads_ch)
 
