@@ -6,6 +6,11 @@ results/
 data/
 genome/
 *.sra
+*.db
+*.sqlite
 __pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
 *.pyc
 .DS_Store

@@ -13,6 +13,7 @@ Designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0
 
 - Full synthetic smoke test in GitHub Actions, including containerised FastQC, fastp, HISAT2, samtools, featureCounts, DESeq2 and MultiQC.
 - Docker, Singularity and AWS Batch profiles in `nextflow.config`.
+- Containerised FastAPI report portal under `cloud/report-portal/` for S3-hosted reports and Postgres run metadata.
 - `nextflow_schema.json` for parameter discovery in Seqera Platform and other launch tooling.
 - Nextflow execution report, timeline, trace and DAG written to `results/pipeline_info/` on every run.
 - `scripts/validate_outputs.py` checks count matrices, DESeq2 output, plots, MultiQC and run metadata in CI.
@@ -122,6 +123,16 @@ nextflow run Ekin-Kahraman/rnaseq-nextflow-pipeline \
     --outdir s3://my-rnaseq-bucket/results/airway
 ```
 
+### Report portal
+
+The optional [cloud report portal](cloud/report-portal/) registers cloud runs and returns signed S3 URLs for Nextflow reports, timelines, traces, DAGs and MultiQC output. It is a small FastAPI service backed by Postgres in production and SQLite for local testing.
+
+```bash
+cd cloud/report-portal
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
 ## Parameters
 
 | Parameter | Default | Description |
@@ -157,6 +168,7 @@ results/
 - **BioContainers** — published containers from the Bioconda ecosystem. No custom Dockerfiles to maintain.
 - **Docker and Singularity** — `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
 - **AWS Batch profile** — `-profile awsbatch` runs the same containerised workflow on managed cloud compute with S3 work and output paths.
+- **Report portal separated from compute** — Nextflow stays responsible for execution; the FastAPI portal only stores run metadata and signs S3 artefact links, which keeps the cloud proof small and auditable.
 - **Run metadata by default** — Nextflow report, timeline, trace and DAG are emitted on every run so failures and performance can be audited after the fact.
 - **Reverse-stranded default** — `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
 - **Configurable contrast** — `--ref_condition` sets the DESeq2 reference level. Defaults to "untreated" for the airway dataset.

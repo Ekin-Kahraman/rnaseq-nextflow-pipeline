@@ -17,6 +17,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install Nextflow
         run: |
           curl -s https://get.nextflow.io | bash
@@ -43,3 +47,9 @@ jobs:
 
       - name: Verify outputs
         run: python scripts/validate_outputs.py results
+
+      - name: Test report portal
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r cloud/report-portal/requirements.txt
+          pytest cloud/report-portal/tests
