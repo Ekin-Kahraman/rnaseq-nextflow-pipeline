@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "https://raw.githubusercontent.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/main/nextflow_schema.json",
+  "title": "RNA-seq Nextflow Pipeline Parameters",
+  "description": "Parameters for a containerised paired-end bulk RNA-seq workflow covering QC, trimming, alignment, quantification, DESeq2 and MultiQC.",
+  "type": "object",
+  "properties": {
+    "samplesheet": {
+      "type": "string",
+      "default": "assets/samplesheet.csv",
+      "description": "CSV file with columns sample_id, fastq_1, fastq_2 and condition."
+    },
+    "genome_index": {
+      "type": "string",
+      "description": "HISAT2 genome index prefix, excluding the .1.ht2/.2.ht2 suffix."
+    },
+    "gtf": {
+      "type": "string",
+      "description": "Gene annotation GTF used by featureCounts."
+    },
+    "outdir": {
+      "type": "string",
+      "default": "results",
+      "description": "Directory or object-store URI for published results."
+    },
+    "strandedness": {
+      "type": "integer",
+      "default": 2,
+      "enum": [0, 1, 2],
+      "description": "featureCounts strandedness: 0 unstranded, 1 forward, 2 reverse."
+    },
+    "ref_condition": {
+      "type": "string",
+      "default": "untreated",
+      "description": "Reference condition used in the DESeq2 contrast."
+    },
+    "aws_queue": {
+      "type": ["string", "null"],
+      "description": "AWS Batch queue name used by the awsbatch profile."
+    },
+    "aws_region": {
+      "type": "string",
+      "default": "eu-west-2",
+      "description": "AWS region used by the awsbatch profile."
+    },
+    "aws_workdir": {
+      "type": ["string", "null"],
+      "description": "S3 work directory used by the awsbatch profile, for example s3://bucket/work."
+    }
+  },
+  "required": ["samplesheet", "genome_index", "gtf"]
+}

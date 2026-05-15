@@ -3,10 +3,19 @@
 [![CI](https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Nextflow](https://img.shields.io/badge/Nextflow-%E2%89%A524.0-brightgreen)](https://www.nextflow.io/)
+[![AWS Batch](https://img.shields.io/badge/AWS%20Batch-profile-orange)](docs/cloud.md)
 
 Bulk RNA-seq pipeline in Nextflow DSL2. Takes paired-end FASTQ reads from raw sequencing output through to differential expression results — QC, trimming, alignment, counting, and DESeq2 — with each step containerised via Docker or Singularity.
 
-Applied to the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625) airway smooth muscle dataset (dexamethasone vs untreated, GEO [GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html). For the full covariate-adjusted analysis on a COVID-19 cohort, see [bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
+Designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625) airway smooth muscle dataset (dexamethasone vs untreated, GEO [GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html). For the full covariate-adjusted analysis on a COVID-19 cohort, see [bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
+
+## Production Readiness
+
+- Full synthetic smoke test in GitHub Actions, including containerised FastQC, fastp, HISAT2, samtools, featureCounts, DESeq2 and MultiQC.
+- Docker, Singularity and AWS Batch profiles in `nextflow.config`.
+- `nextflow_schema.json` for parameter discovery in Seqera Platform and other launch tooling.
+- Nextflow execution report, timeline, trace and DAG written to `results/pipeline_info/` on every run.
+- `scripts/validate_outputs.py` checks count matrices, DESeq2 output, plots, MultiQC and run metadata in CI.
 
 ## Workflow
 
@@ -71,6 +80,7 @@ python test/create_test_data.py
 nextflow run main.nf -profile test,docker \
     --genome_index "$(pwd)/test/genome" \
     --gtf "$(pwd)/test/genes.gtf"
+python scripts/validate_outputs.py results
 ```
 
 ### Real data (airway dataset)
@@ -96,6 +106,22 @@ nextflow run main.nf -profile docker \
     --gtf genome/gencode.v38.annotation.gtf
 ```
 
+### Cloud execution
+
+See [docs/cloud.md](docs/cloud.md) for AWS Batch and Seqera Platform launch notes.
+
+```bash
+nextflow run Ekin-Kahraman/rnaseq-nextflow-pipeline \
+    -profile awsbatch \
+    --aws_queue rnaseq-job-queue \
+    --aws_region eu-west-2 \
+    --aws_workdir s3://my-rnaseq-bucket/work \
+    --samplesheet s3://my-rnaseq-bucket/inputs/samplesheet.csv \
+    --genome_index s3://my-rnaseq-bucket/reference/grch38/genome \
+    --gtf s3://my-rnaseq-bucket/reference/gencode.v38.annotation.gtf \
+    --outdir s3://my-rnaseq-bucket/results/airway
+```
+
 ## Parameters
 
 | Parameter | Default | Description |
@@ -106,6 +132,9 @@ nextflow run main.nf -profile docker \
 | `--outdir` | `results` | Output directory |
 | `--strandedness` | `2` (reverse) | featureCounts strandedness (0/1/2) |
 | `--ref_condition` | `untreated` | DESeq2 reference level |
+| `--aws_queue` | none | AWS Batch queue for `-profile awsbatch` |
+| `--aws_region` | `eu-west-2` | AWS region for `-profile awsbatch` |
+| `--aws_workdir` | none | S3 work directory for `-profile awsbatch` |
 
 ## Output
 
@@ -117,7 +146,8 @@ results/
 ├── bam/              Sorted BAM files
 ├── counts/           Gene count matrix
 ├── deseq2/           DE results, volcano plot, PCA plot
-└── multiqc/          Aggregated QC report
+├── multiqc/          Aggregated QC report
+└── pipeline_info/    Nextflow report, timeline, trace, DAG
 ```
 
 ## Design Decisions
@@ -126,6 +156,8 @@ results/
 - **featureCounts over htseq-count** — faster on multi-sample runs (native multithreading) and produces identical counts for standard gene-level quantification.
 - **BioContainers** — published containers from the Bioconda ecosystem. No custom Dockerfiles to maintain.
 - **Docker and Singularity** — `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
+- **AWS Batch profile** — `-profile awsbatch` runs the same containerised workflow on managed cloud compute with S3 work and output paths.
+- **Run metadata by default** — Nextflow report, timeline, trace and DAG are emitted on every run so failures and performance can be audited after the fact.
 - **Reverse-stranded default** — `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
 - **Configurable contrast** — `--ref_condition` sets the DESeq2 reference level. Defaults to "untreated" for the airway dataset.
 - **Test profile** — synthetic 50-gene genome with reads sampled from the reference sequence. Verifies the full pipeline in ~2 minutes without downloading real data.
@@ -133,7 +165,7 @@ results/
 ## Limitations
 
 - **2 samples per condition in the demo** — underpowered for reliable DE. The DESeq2 step runs and produces output, but with n=2 the results are illustrative, not statistically robust. Proper analysis requires ≥3 replicates per condition.
-- **No real data results yet** — the pipeline has been verified on synthetic test data and is awaiting execution on the UEA HPC (Hali) with the full airway dataset.
+- **CI uses synthetic data** — the public CI proves the full software path, not the biological conclusion. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
 - **No STAR option** — only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
 
 ## Licence

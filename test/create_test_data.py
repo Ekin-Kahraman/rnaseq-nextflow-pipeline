@@ -6,13 +6,16 @@ are just large enough for each pipeline step to run without error.
 """
 
 import gzip
+import io
 import random
 import subprocess
 import os
+from pathlib import Path
 
 random.seed(42)
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(TEST_DIR)
 N_READS = 2000
 READ_LEN = 100
 GENE_LEN = 500
@@ -34,24 +37,29 @@ def write_fastq_pair(sample_id, n_reads, outdir, genome_seq):
         max_start = 0
     for read_num in [1, 2]:
         path = os.path.join(outdir, f"{sample_id}_{read_num}.fastq.gz")
-        with gzip.open(path, "wt") as f:
-            for i in range(n_reads):
-                # Sample a position from the genome
-                start = random.randint(0, max_start)
-                if read_num == 1:
-                    seq = genome_seq[start : start + READ_LEN]
-                else:
-                    # Mate reads from ~200bp downstream
-                    mate_start = start + READ_LEN + random.randint(50, 200)
-                    mate_start = min(mate_start, len(genome_seq) - READ_LEN)
-                    seq = genome_seq[mate_start : mate_start + READ_LEN]
-                    # Reverse complement for paired-end
-                    comp = str.maketrans("ACGT", "TGCA")
-                    seq = seq.translate(comp)[::-1]
-                f.write(f"@{sample_id}.{i}/R{read_num}\n")
-                f.write(seq + "\n")
-                f.write("+\n")
-                f.write(QUAL + "\n")
+        with open(path, "wb") as raw:
+            gzip_name = os.path.basename(path)
+            if gzip_name.endswith(".gz"):
+                gzip_name = gzip_name[:-3]
+            with gzip.GzipFile(filename=gzip_name, mode="wb", fileobj=raw, mtime=0) as gz:
+                with io.TextIOWrapper(gz, encoding="utf-8", newline="") as f:
+                    for i in range(n_reads):
+                        # Sample a position from the genome
+                        start = random.randint(0, max_start)
+                        if read_num == 1:
+                            seq = genome_seq[start : start + READ_LEN]
+                        else:
+                            # Mate reads from ~200bp downstream
+                            mate_start = start + READ_LEN + random.randint(50, 200)
+                            mate_start = min(mate_start, len(genome_seq) - READ_LEN)
+                            seq = genome_seq[mate_start : mate_start + READ_LEN]
+                            # Reverse complement for paired-end
+                            comp = str.maketrans("ACGT", "TGCA")
+                            seq = seq.translate(comp)[::-1]
+                        f.write(f"@{sample_id}.{i}/R{read_num}\n")
+                        f.write(seq + "\n")
+                        f.write("+\n")
+                        f.write(QUAL + "\n")
     print(f"  {sample_id}: {n_reads} read pairs (sampled from genome)")
 
 
@@ -94,10 +102,12 @@ def write_samplesheet(samples, outdir):
     with open(path, "w") as f:
         f.write("sample_id,fastq_1,fastq_2,condition\n")
         for sample_id, condition in samples:
+            fastq_1 = Path(outdir, f"{sample_id}_1.fastq.gz").relative_to(PROJECT_DIR)
+            fastq_2 = Path(outdir, f"{sample_id}_2.fastq.gz").relative_to(PROJECT_DIR)
             f.write(
                 f"{sample_id},"
-                f"{outdir}/{sample_id}_1.fastq.gz,"
-                f"{outdir}/{sample_id}_2.fastq.gz,"
+                f"{fastq_1},"
+                f"{fastq_2},"
                 f"{condition}\n"
             )
     print(f"  Samplesheet: {len(samples)} samples")

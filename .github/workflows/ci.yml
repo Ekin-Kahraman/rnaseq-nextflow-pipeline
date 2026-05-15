@@ -25,6 +25,9 @@ jobs:
       - name: Generate test data
         run: python test/create_test_data.py
 
+      - name: Validate Nextflow config
+        run: nextflow config -profile test,docker
+
       - name: Build test HISAT2 index
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE/test:/data" \
@@ -39,10 +42,4 @@ jobs:
             --gtf "$GITHUB_WORKSPACE/test/genes.gtf"
 
       - name: Verify outputs
-        run: |
-          test -f results/counts/gene_counts.txt
-          test -f results/deseq2/deseq2_results.csv
-          test -f results/deseq2/volcano_plot.png
-          test -f results/deseq2/pca_plot.png
-          test -f results/multiqc/multiqc_report.html
-          echo "All outputs verified"
+        run: python scripts/validate_outputs.py results
