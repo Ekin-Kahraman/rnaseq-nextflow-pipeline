@@ -5,11 +5,11 @@
 [![Nextflow](https://img.shields.io/badge/Nextflow-%E2%89%A524.0-brightgreen)](https://www.nextflow.io/)
 [![AWS Batch](https://img.shields.io/badge/AWS%20Batch-profile-orange)](docs/cloud.md)
 
-Bulk RNA-seq pipeline in Nextflow DSL2. Takes paired-end FASTQ reads from raw sequencing output through to differential expression results — QC, trimming, alignment, counting, and DESeq2 — with each step containerised via Docker or Singularity.
+Bulk RNA-seq pipeline in Nextflow DSL2. Takes paired-end FASTQ reads from raw sequencing output through to differential expression results - QC, trimming, alignment, counting, and DESeq2 - with each step containerised via Docker or Singularity.
 
 Designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625) airway smooth muscle dataset (dexamethasone vs untreated, GEO [GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html). For the full covariate-adjusted analysis on a COVID-19 cohort, see [bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
 
-## Production Readiness
+## Engineering Evidence
 
 - Full synthetic smoke test in GitHub Actions, including containerised FastQC, fastp, HISAT2, samtools, featureCounts, DESeq2 and MultiQC.
 - Docker, Singularity and AWS Batch profiles in `nextflow.config`.
@@ -163,22 +163,23 @@ results/
 
 ## Design Decisions
 
-- **HISAT2 over STAR** — HISAT2's graph FM index fits in ~8GB RAM vs STAR's ~32GB for the human genome. Both are splice-aware aligners with comparable accuracy for well-annotated genomes; HISAT2 was chosen to keep the pipeline runnable on standard hardware.
-- **featureCounts over htseq-count** — faster on multi-sample runs (native multithreading) and produces identical counts for standard gene-level quantification.
-- **BioContainers** — published containers from the Bioconda ecosystem. No custom Dockerfiles to maintain.
-- **Docker and Singularity** — `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
-- **AWS Batch profile** — `-profile awsbatch` runs the same containerised workflow on managed cloud compute with S3 work and output paths.
-- **Report portal separated from compute** — Nextflow stays responsible for execution; the FastAPI portal only stores run metadata and signs S3 artefact links, which keeps the cloud proof small and auditable.
-- **Run metadata by default** — Nextflow report, timeline, trace and DAG are emitted on every run so failures and performance can be audited after the fact.
-- **Reverse-stranded default** — `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
-- **Configurable contrast** — `--ref_condition` sets the DESeq2 reference level. Defaults to "untreated" for the airway dataset.
-- **Test profile** — synthetic 50-gene genome with reads sampled from the reference sequence. Verifies the full pipeline in ~2 minutes without downloading real data.
+- **HISAT2 over STAR** - HISAT2's graph FM index fits in ~8GB RAM vs STAR's ~32GB for the human genome. Both are splice-aware aligners with comparable accuracy for well-annotated genomes; HISAT2 was chosen to keep the pipeline runnable on standard hardware.
+- **featureCounts over htseq-count** - faster on multi-sample runs (native multithreading) and produces identical counts for standard gene-level quantification.
+- **BioContainers** - published containers from the Bioconda ecosystem. No custom Dockerfiles to maintain.
+- **Docker and Singularity** - `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
+- **AWS Batch profile** - `-profile awsbatch` runs the same containerised workflow on managed cloud compute with S3 work and output paths.
+- **Report portal separated from compute** - Nextflow stays responsible for execution; the FastAPI portal only stores run metadata and signs S3 artefact links, which keeps the cloud proof small and auditable.
+- **Run metadata by default** - Nextflow report, timeline, trace and DAG are emitted on every run so failures and performance can be audited after the fact.
+- **Reverse-stranded default** - `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
+- **Configurable contrast** - `--ref_condition` sets the DESeq2 reference level. Defaults to "untreated" for the airway dataset.
+- **Test profile** - synthetic 50-gene genome with reads sampled from the reference sequence. Verifies the full pipeline in ~2 minutes without downloading real data.
 
 ## Limitations
 
-- **2 samples per condition in the demo** — underpowered for reliable DE. The DESeq2 step runs and produces output, but with n=2 the results are illustrative, not statistically robust. Proper analysis requires ≥3 replicates per condition.
-- **CI uses synthetic data** — the public CI proves the full software path, not the biological conclusion. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
-- **No STAR option** — only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
+- **2 samples per condition in the demo** - underpowered for reliable DE. The DESeq2 step runs and produces output, but with n=2 the results are illustrative, not statistically robust. Proper analysis requires ≥3 replicates per condition.
+- **CI uses synthetic data** - the public CI proves the full software path, not the biological conclusion. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
+- **AWS Batch proof status** - the profile and report portal are implemented, but no public real AWS Batch run artefact is committed yet.
+- **No STAR option** - only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
 
 ## Licence
 
