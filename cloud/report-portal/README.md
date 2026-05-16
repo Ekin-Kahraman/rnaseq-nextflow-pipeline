@@ -4,6 +4,8 @@ Small FastAPI service for registering cloud RNA-seq runs and serving signed link
 
 This is intentionally separate from the Nextflow pipeline. The pipeline remains responsible for compute and published artefacts; the portal gives reviewers and collaborators a minimal cloud-facing surface for run status and report access.
 
+The root route renders a small dashboard for browser review. The API remains available through `/docs`, `/runs` and `/runs/{id}/artifacts`.
+
 ## Architecture
 
 ```text
@@ -25,6 +27,8 @@ Nextflow AWS Batch run
 | `DATABASE_URL` | `postgresql+psycopg://rnaseq:change_me@db:5432/rnaseq` | Metadata database. Defaults to local SQLite for development. |
 | `AWS_REGION` | `eu-west-2` | Region used by the AWS SDK. |
 | AWS credentials | IAM role, env vars, or workload identity | Required only for signed S3 URLs. |
+| `DEMO_RUN_ID` | `synthetic-ci-001` | Optional seed run for live demos. |
+| `DEMO_S3_PREFIX` | `s3://bucket/results/synthetic-ci-001` | Optional S3 prefix for the seeded demo run. |
 
 ## Local Smoke Run
 
@@ -34,6 +38,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
+
+Open <http://localhost:8000> for the dashboard or <http://localhost:8000/docs> for the OpenAPI UI.
 
 Register a completed run:
 
@@ -61,6 +67,29 @@ docker build -t rnaseq-report-portal .
 docker run --rm -p 8000:8000 \
   -e DATABASE_URL=postgresql+psycopg://rnaseq:change_me@host.docker.internal:5432/rnaseq \
   rnaseq-report-portal
+```
+
+Run the full local stack with Postgres:
+
+```bash
+docker compose up --build
+```
+
+The compose stack seeds a synthetic run so the dashboard has a visible record immediately.
+
+## Render Blueprint
+
+The repository root contains `render.yaml` for a reproducible Render deployment:
+
+- Docker web service built from `cloud/report-portal/Dockerfile`.
+- Managed Postgres database connected through `DATABASE_URL`.
+- Optional demo run seeded through `DEMO_RUN_ID` and `DEMO_S3_PREFIX`.
+- AWS credentials stored as Dashboard secrets for S3 presigned URLs.
+
+Open the Blueprint after the file is pushed:
+
+```text
+https://dashboard.render.com/blueprint/new?repo=https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline
 ```
 
 ## Tests

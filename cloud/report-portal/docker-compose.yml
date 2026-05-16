@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: rnaseq_report_portal
+      POSTGRES_USER: rnaseq_portal
+      POSTGRES_PASSWORD: rnaseq_portal
+    ports:
+      - "5432:5432"
+    volumes:
+      - rnaseq_report_portal_postgres:/var/lib/postgresql/data
+
+  portal:
+    build: .
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://rnaseq_portal:rnaseq_portal@postgres:5432/rnaseq_report_portal
+      AWS_REGION: eu-west-2
+      DEMO_RUN_ID: synthetic-ci-001
+      DEMO_RUN_NAME: Synthetic CI smoke run
+      DEMO_RUN_STATUS: succeeded
+      DEMO_S3_PREFIX: s3://example-rnaseq-results/synthetic-ci-001
+
+volumes:
+  rnaseq_report_portal_postgres:

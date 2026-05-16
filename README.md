@@ -14,6 +14,7 @@ Designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0
 - Full synthetic smoke test in GitHub Actions, including containerised FastQC, fastp, HISAT2, samtools, featureCounts, DESeq2 and MultiQC.
 - Docker, Singularity and AWS Batch profiles in `nextflow.config`.
 - Containerised FastAPI report portal under `cloud/report-portal/` for S3-hosted reports and Postgres run metadata.
+- Render Blueprint at `render.yaml` for a deployable FastAPI plus Postgres report portal.
 - `nextflow_schema.json` for parameter discovery in Seqera Platform and other launch tooling.
 - Nextflow execution report, timeline, trace and DAG written to `results/pipeline_info/` on every run.
 - `scripts/validate_outputs.py` checks count matrices, DESeq2 output, plots, MultiQC and run metadata in CI.
@@ -125,12 +126,25 @@ nextflow run Ekin-Kahraman/rnaseq-nextflow-pipeline \
 
 ### Report portal
 
-The optional [cloud report portal](cloud/report-portal/) registers cloud runs and returns signed S3 URLs for Nextflow reports, timelines, traces, DAGs and MultiQC output. It is a small FastAPI service backed by Postgres in production and SQLite for local testing.
+The optional [cloud report portal](cloud/report-portal/) registers cloud runs and returns signed S3 URLs for Nextflow reports, timelines, traces, DAGs and MultiQC output. It is a small FastAPI service backed by Postgres in production and SQLite for local testing. The root route renders a browser dashboard and `/docs` exposes the API.
 
 ```bash
 cd cloud/report-portal
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
+```
+
+Run the local Postgres stack:
+
+```bash
+cd cloud/report-portal
+docker compose up --build
+```
+
+Deploy shape:
+
+```text
+render.yaml -> Docker FastAPI service + managed Postgres + S3 presigned report links
 ```
 
 ## Parameters
@@ -169,6 +183,7 @@ results/
 - **Docker and Singularity** - `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
 - **AWS Batch profile** - `-profile awsbatch` runs the same containerised workflow on managed cloud compute with S3 work and output paths.
 - **Report portal separated from compute** - Nextflow stays responsible for execution; the FastAPI portal only stores run metadata and signs S3 artefact links, which keeps the cloud proof small and auditable.
+- **Render Blueprint** - `render.yaml` defines the web service, managed Postgres database, demo seed run and AWS secret placeholders as reviewable infrastructure-as-code.
 - **Run metadata by default** - Nextflow report, timeline, trace and DAG are emitted on every run so failures and performance can be audited after the fact.
 - **Reverse-stranded default** - `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
 - **Configurable contrast** - `--ref_condition` sets the DESeq2 reference level. Defaults to "untreated" for the airway dataset.
@@ -178,7 +193,7 @@ results/
 
 - **2 samples per condition in the demo** - underpowered for reliable DE. The DESeq2 step runs and produces output, but with n=2 the results are illustrative, not statistically robust. Proper analysis requires ≥3 replicates per condition.
 - **CI uses synthetic data** - the public CI proves the full software path, not the biological conclusion. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
-- **AWS Batch proof status** - the profile and report portal are implemented, but no public real AWS Batch run artefact is committed yet.
+- **AWS Batch proof status** - the profile and report portal are implemented, but no public real AWS Batch run artefact is committed yet. The report portal is the current cloud proof path until a real Batch run is published.
 - **No STAR option** - only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
 
 ## Licence

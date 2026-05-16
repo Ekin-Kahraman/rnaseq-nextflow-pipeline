@@ -10,14 +10,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -53,3 +53,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r cloud/report-portal/requirements.txt
           pytest cloud/report-portal/tests
+
+      - name: Build report portal image
+        run: docker build -t rnaseq-report-portal cloud/report-portal

@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: rnaseq-report-portal
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    autoDeploy: true
+    dockerfilePath: ./cloud/report-portal/Dockerfile
+    dockerContext: ./cloud/report-portal
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rnaseq-report-portal-db
+          property: connectionString
+      - key: AWS_REGION
+        value: eu-west-2
+      - key: DEMO_RUN_ID
+        value: synthetic-ci-001
+      - key: DEMO_RUN_NAME
+        value: Synthetic CI smoke run
+      - key: DEMO_RUN_STATUS
+        value: succeeded
+      - key: DEMO_S3_PREFIX
+        value: s3://example-rnaseq-results/synthetic-ci-001
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_SESSION_TOKEN
+        sync: false
+
+databases:
+  - name: rnaseq-report-portal-db
+    databaseName: rnaseq_report_portal
+    user: rnaseq_portal
+    plan: free
+    postgresMajorVersion: "16"
+    ipAllowList: []

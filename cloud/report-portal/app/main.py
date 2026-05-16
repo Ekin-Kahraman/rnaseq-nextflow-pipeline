@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from html import escape
 from typing import Literal
 from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, DateTime, String, create_engine, select, text
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
@@ -15,6 +17,8 @@ from sqlalchemy.orm import Session, declarative_base, sessionmaker
 DEFAULT_DATABASE_URL = "sqlite:///./runs.db"
 RunStatus = Literal["submitted", "running", "succeeded", "failed", "unknown"]
 ArtifactName = Literal["report", "timeline", "trace", "dag", "multiqc"]
+ARTIFACTS: tuple[ArtifactName, ...] = ("report", "timeline", "trace", "dag", "multiqc")
+VALID_STATUSES = {"submitted", "running", "succeeded", "failed", "unknown"}
 
 Base = declarative_base()
 
@@ -78,10 +82,24 @@ class RunOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ArtifactOut(BaseModel):
+    artifact: ArtifactName
+    s3_uri: str | None
+    presign_path: str
+
+
 def model_data(model: BaseModel, *, exclude_unset: bool = False) -> dict:
     if hasattr(model, "model_dump"):
         return model.model_dump(exclude_unset=exclude_unset)
     return model.dict(exclude_unset=exclude_unset)
+
+
+def normalise_database_url(database_url: str) -> str:
+    if database_url.startswith("postgres://"):
+        return "postgresql+psycopg://" + database_url.removeprefix("postgres://")
+    if database_url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + database_url.removeprefix("postgresql://")
+    return database_url
 
 
 def engine_options(database_url: str) -> dict:
@@ -97,14 +115,138 @@ def parse_s3_uri(uri: str) -> tuple[str, str]:
     return parsed.netloc, parsed.path.lstrip("/")
 
 
-def resolve_artifact_uri(run: RunModel, artifact: ArtifactName) -> str:
+def artifact_path(run: RunModel, artifact: ArtifactName) -> str:
     attr = "nextflow_report" if artifact == "report" else "multiqc_report" if artifact == "multiqc" else artifact
-    value = getattr(run, attr)
+    return getattr(run, attr)
+
+
+def artifact_s3_uri(run: RunModel, artifact: ArtifactName) -> str | None:
+    value = artifact_path(run, artifact)
     if value.startswith("s3://"):
         return value
     if not run.s3_prefix:
-        raise HTTPException(status_code=404, detail="Run has no s3_prefix for relative artefact paths")
+        return None
     return f"{run.s3_prefix.rstrip('/')}/{value.lstrip('/')}"
+
+
+def resolve_artifact_uri(run: RunModel, artifact: ArtifactName) -> str:
+    uri = artifact_s3_uri(run, artifact)
+    if uri is None:
+        raise HTTPException(status_code=404, detail="Run has no s3_prefix for relative artefact paths")
+    return uri
+
+
+def render_dashboard(runs: list[RunModel]) -> str:
+    cards = []
+    for run in runs:
+        artifact_links = "".join(
+            f'<li><a href="/runs/{escape(run.id)}/artifacts/{artifact}">{artifact}</a></li>'
+            for artifact in ARTIFACTS
+        )
+        cards.append(
+            f"""
+            <article class="run">
+              <div>
+                <h2>{escape(run.name)}</h2>
+                <p class="meta">{escape(run.id)} | {escape(run.status)}</p>
+                <p>{escape(run.s3_prefix or "No S3 prefix configured")}</p>
+              </div>
+              <ul>{artifact_links}</ul>
+            </article>
+            """
+        )
+    body = "\n".join(cards) if cards else '<p class="empty">No runs registered yet.</p>'
+    return f"""
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>RNA-seq Report Portal</title>
+        <style>
+          :root {{
+            color-scheme: light;
+            --bg: #f7f8fb;
+            --panel: #ffffff;
+            --text: #111827;
+            --muted: #5b6472;
+            --line: #d8dee8;
+            --accent: #0f766e;
+          }}
+          * {{ box-sizing: border-box; }}
+          body {{
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          }}
+          main {{ max-width: 1040px; margin: 0 auto; padding: 40px 20px; }}
+          header {{ display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 28px; }}
+          h1 {{ margin: 0 0 8px; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1; }}
+          h2 {{ margin: 0 0 6px; font-size: 1.05rem; }}
+          p {{ margin: 0; color: var(--muted); overflow-wrap: anywhere; }}
+          a {{ color: var(--accent); font-weight: 700; text-decoration: none; }}
+          a:hover {{ text-decoration: underline; }}
+          .actions {{ display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }}
+          .button {{ border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; background: var(--panel); color: var(--text); }}
+          .run {{
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 24px;
+            align-items: center;
+            padding: 18px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            margin-bottom: 12px;
+          }}
+          .meta {{ font-size: 0.9rem; margin-bottom: 8px; }}
+          ul {{ display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; padding: 0; margin: 0; list-style: none; }}
+          li a {{ display: block; border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; background: #f9fafb; }}
+          .empty {{ padding: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }}
+          @media (max-width: 760px) {{
+            header, .run {{ display: block; }}
+            .actions, ul {{ justify-content: flex-start; margin-top: 14px; }}
+          }}
+        </style>
+      </head>
+      <body>
+        <main>
+          <header>
+            <div>
+              <h1>RNA-seq Report Portal</h1>
+              <p>Registered Nextflow runs with S3-backed report artefacts.</p>
+            </div>
+            <nav class="actions">
+              <a class="button" href="/docs">API docs</a>
+              <a class="button" href="/health">Health</a>
+            </nav>
+          </header>
+          <section>{body}</section>
+        </main>
+      </body>
+    </html>
+    """
+
+
+def seed_demo_run(session_local: sessionmaker[Session]) -> None:
+    run_id = os.getenv("DEMO_RUN_ID")
+    if not run_id:
+        return
+    status_value = os.getenv("DEMO_RUN_STATUS", "succeeded")
+    run_status = status_value if status_value in VALID_STATUSES else "unknown"
+    with session_local() as db:
+        if db.get(RunModel, run_id):
+            return
+        db.add(
+            RunModel(
+                id=run_id,
+                name=os.getenv("DEMO_RUN_NAME", "Synthetic CI airway test"),
+                status=run_status,
+                s3_prefix=os.getenv("DEMO_S3_PREFIX"),
+            )
+        )
+        db.commit()
 
 
 def get_s3_client():
@@ -114,10 +256,11 @@ def get_s3_client():
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
-    db_url = database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    db_url = normalise_database_url(database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
     engine = create_engine(db_url, **engine_options(db_url))
     session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     Base.metadata.create_all(bind=engine)
+    seed_demo_run(session_local)
 
     app = FastAPI(
         title="RNA-seq Report Portal",
@@ -131,6 +274,11 @@ def create_app(database_url: str | None = None) -> FastAPI:
             yield db
         finally:
             db.close()
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def dashboard(db: Session = Depends(get_db)) -> HTMLResponse:
+        stmt = select(RunModel).order_by(RunModel.created_at.desc()).limit(50)
+        return HTMLResponse(render_dashboard(list(db.scalars(stmt))))
 
     @app.get("/health")
     def health(db: Session = Depends(get_db)) -> dict:
@@ -164,6 +312,31 @@ def create_app(database_url: str | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
         return run
 
+    @app.get("/runs/{run_id}/artifacts", response_model=list[ArtifactOut])
+    def list_artifacts(run_id: str, db: Session = Depends(get_db)) -> list[dict]:
+        run = db.get(RunModel, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
+        return [
+            {
+                "artifact": artifact,
+                "s3_uri": artifact_s3_uri(run, artifact),
+                "presign_path": f"/runs/{run.id}/artifacts/{artifact}/presign",
+            }
+            for artifact in ARTIFACTS
+        ]
+
+    @app.get("/runs/{run_id}/artifacts/{artifact}", response_model=ArtifactOut)
+    def get_artifact(run_id: str, artifact: ArtifactName, db: Session = Depends(get_db)) -> dict:
+        run = db.get(RunModel, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
+        return {
+            "artifact": artifact,
+            "s3_uri": artifact_s3_uri(run, artifact),
+            "presign_path": f"/runs/{run.id}/artifacts/{artifact}/presign",
+        }
+
     @app.patch("/runs/{run_id}", response_model=RunOut)
     def update_run(run_id: str, payload: RunUpdate, db: Session = Depends(get_db)) -> RunModel:
         run = db.get(RunModel, run_id)
@@ -190,11 +363,18 @@ def create_app(database_url: str | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
         s3_uri = resolve_artifact_uri(run, artifact)
         bucket, key = parse_s3_uri(s3_uri)
-        url = s3_client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": bucket, "Key": key},
-            ExpiresIn=expires,
-        )
+        try:
+            url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": bucket, "Key": key},
+                ExpiresIn=expires,
+            )
+        except Exception as exc:
+            from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
+
+            if isinstance(exc, (BotoCoreError, ClientError, NoCredentialsError)):
+                raise HTTPException(status_code=503, detail=f"S3 presigning unavailable: {exc.__class__.__name__}") from exc
+            raise
         return {"artifact": artifact, "s3_uri": s3_uri, "url": url, "expires_in": expires}
 
     return app

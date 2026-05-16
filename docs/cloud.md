@@ -62,6 +62,8 @@ The repository includes a minimal FastAPI report portal in `cloud/report-portal/
 - `pipeline_info/dag.dot`
 - `multiqc/multiqc_report.html`
 
+The root route renders a browser dashboard for registered runs, while `/docs` exposes the OpenAPI UI. This makes the cloud proof reviewable without needing to read raw JSON.
+
 Local smoke run:
 
 ```bash
@@ -70,6 +72,13 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
+```
+
+Local Postgres stack:
+
+```bash
+cd cloud/report-portal
+docker compose up --build
 ```
 
 Production shape:
@@ -83,3 +92,11 @@ docker run --rm -p 8000:8000 \
 ```
 
 For ECS/Fargate, give the task role read-only access to the S3 result prefix and keep write access limited to the Postgres database. The service does not need permission to launch Batch jobs.
+
+For Render, the repository root `render.yaml` provisions the Docker web service and a managed Postgres database. After pushing `render.yaml`, open:
+
+```text
+https://dashboard.render.com/blueprint/new?repo=https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline
+```
+
+Fill the AWS secret fields only when presigned S3 URLs need to work against a real result bucket. The seeded demo run is enough to show the portal and metadata layer before wiring real S3 credentials.
