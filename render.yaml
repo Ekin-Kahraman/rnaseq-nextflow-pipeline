@@ -5,6 +5,7 @@ services:
     plan: free
     region: oregon
     branch: main
+    repo: https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline
     autoDeploy: true
     dockerfilePath: ./cloud/report-portal/Dockerfile
     dockerContext: ./cloud/report-portal
