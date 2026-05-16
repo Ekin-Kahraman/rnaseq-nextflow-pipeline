@@ -15,6 +15,7 @@ Designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0
 - Docker, Singularity and AWS Batch profiles in `nextflow.config`.
 - Containerised FastAPI report portal under `cloud/report-portal/` for S3-hosted reports and Postgres run metadata.
 - Render Blueprint at `render.yaml` for a deployable FastAPI plus Postgres report portal.
+- Live Render smoke deployment: <https://rnaseq-report-portal.onrender.com/health>.
 - `nextflow_schema.json` for parameter discovery in Seqera Platform and other launch tooling.
 - Nextflow execution report, timeline, trace and DAG written to `results/pipeline_info/` on every run.
 - `scripts/validate_outputs.py` checks count matrices, DESeq2 output, plots, MultiQC and run metadata in CI.
@@ -147,6 +148,12 @@ Deploy shape:
 render.yaml -> Docker FastAPI service + managed Postgres + S3 presigned report links
 ```
 
+Live smoke deployment:
+
+- Dashboard: <https://rnaseq-report-portal.onrender.com/>
+- Health: <https://rnaseq-report-portal.onrender.com/health>
+- Seeded artefact metadata: <https://rnaseq-report-portal.onrender.com/runs/synthetic-ci-001/artifacts/report>
+
 ## Parameters
 
 | Parameter | Default | Description |
@@ -193,7 +200,7 @@ results/
 
 - **2 samples per condition in the demo** - underpowered for reliable DE. The DESeq2 step runs and produces output, but with n=2 the results are illustrative, not statistically robust. Proper analysis requires ≥3 replicates per condition.
 - **CI uses synthetic data** - the public CI proves the full software path, not the biological conclusion. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
-- **AWS Batch proof status** - the profile and report portal are implemented, but no public real AWS Batch run artefact is committed yet. The report portal is the current cloud proof path until a real Batch run is published.
+- **AWS Batch proof status** - the profile and report portal are implemented, but no public real AWS Batch run artefact is committed yet. The live report portal is the current cloud proof path until a real Batch run is published.
 - **No STAR option** - only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
 
 ## Licence

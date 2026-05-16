@@ -92,6 +92,12 @@ Open the Blueprint after the file is pushed:
 https://dashboard.render.com/blueprint/new?repo=https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline
 ```
 
+Current live smoke deployment:
+
+- Dashboard: <https://rnaseq-report-portal.onrender.com/>
+- Health: <https://rnaseq-report-portal.onrender.com/health>
+- Seeded artefact metadata: <https://rnaseq-report-portal.onrender.com/runs/synthetic-ci-001/artifacts/report>
+
 ## Tests
 
 ```bash

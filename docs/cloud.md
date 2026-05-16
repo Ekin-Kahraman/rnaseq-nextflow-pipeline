@@ -100,3 +100,11 @@ https://dashboard.render.com/blueprint/new?repo=https://github.com/Ekin-Kahraman
 ```
 
 Fill the AWS secret fields only when presigned S3 URLs need to work against a real result bucket. The seeded demo run is enough to show the portal and metadata layer before wiring real S3 credentials.
+
+Current live smoke deployment:
+
+- Dashboard: <https://rnaseq-report-portal.onrender.com/>
+- Health: <https://rnaseq-report-portal.onrender.com/health>
+- Seeded artefact metadata: <https://rnaseq-report-portal.onrender.com/runs/synthetic-ci-001/artifacts/report>
+
+This free Render service was created directly from the Docker portal root for fast public proof. The validated `render.yaml` remains the reproducible Postgres-backed deployment path.
