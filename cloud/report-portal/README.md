@@ -2,7 +2,9 @@
 
 Small FastAPI service for registering cloud RNA-seq runs and serving signed links to reports stored in S3.
 
-This is intentionally separate from the Nextflow pipeline. The pipeline remains responsible for compute and published artefacts; the portal gives reviewers and collaborators a minimal cloud-facing surface for run status and report access.
+The Nextflow pipeline runs the analysis. This service stores run details and
+provides a dashboard and report access. The seeded demonstration is not a
+record of a completed AWS Batch analysis.
 
 The root route renders a small dashboard for browser review. The API remains available through `/docs`, `/runs` and `/runs/{id}/artifacts`.
 
@@ -92,7 +94,8 @@ Open the Blueprint after the file is pushed:
 https://dashboard.render.com/blueprint/new?repo=https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline
 ```
 
-Current live smoke deployment:
+Demo endpoints (availability may vary; the health check timed out during the
+7 September 2026 documentation review):
 
 - Dashboard: <https://rnaseq-report-portal.onrender.com/>
 - Health: <https://rnaseq-report-portal.onrender.com/health>

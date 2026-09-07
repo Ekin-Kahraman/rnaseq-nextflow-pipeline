@@ -5,20 +5,18 @@
 [![Nextflow](https://img.shields.io/badge/Nextflow-%E2%89%A524.0-brightgreen)](https://www.nextflow.io/)
 [![AWS Batch](https://img.shields.io/badge/AWS%20Batch-profile-orange)](docs/cloud.md)
 
-Bulk RNA-seq pipeline in Nextflow DSL2. Takes paired-end FASTQ reads from raw sequencing output through to differential expression results - QC, trimming, alignment, counting, and DESeq2 - with each step containerised via Docker or Singularity.
+A reproducible RNA-seq workflow from raw sequencing reads to gene counts,
+differential expression and quality reports. Nextflow coordinates the steps;
+Docker or Singularity supplies their software environments.
 
 Designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625) airway smooth muscle dataset (dexamethasone vs untreated, GEO [GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html). For the full covariate-adjusted analysis on a COVID-19 cohort, see [bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
 
-## Engineering Evidence
+## Validation and reproducibility
 
-- Full synthetic smoke test in GitHub Actions, including containerised FastQC, fastp, HISAT2, samtools, featureCounts, DESeq2 and MultiQC.
-- Docker, Singularity and AWS Batch profiles in `nextflow.config`.
-- Containerised FastAPI report portal under `cloud/report-portal/` for S3-hosted reports and Postgres run metadata.
-- Render Blueprint at `render.yaml` for a deployable FastAPI plus Postgres report portal.
-- Live Render smoke deployment: <https://rnaseq-report-portal.onrender.com/health>.
-- `nextflow_schema.json` for parameter discovery in Seqera Platform and other launch tooling.
-- Nextflow execution report, timeline, trace and DAG written to `results/pipeline_info/` on every run.
-- `scripts/validate_outputs.py` checks count matrices, DESeq2 output, plots, MultiQC and run metadata in CI.
+- Automated tests run the complete workflow on synthetic reads and check the count matrix, expression results, reports and run records.
+- Versioned analysis containers and saved run reports make the workflow easier to reproduce and diagnose.
+- Local/HPC profiles and AWS Batch configuration are included. No completed real AWS Batch analysis is claimed.
+- An optional report portal provides a dashboard for registered runs and stored reports; it is separate from the analysis itself.
 
 ## Workflow
 
@@ -72,7 +70,7 @@ All containers sourced from [BioContainers](https://biocontainers.pro/).
 
 ## Quick Start
 
-**Prerequisites:** [Nextflow](https://www.nextflow.io/) (>=24.0), [Docker](https://www.docker.com/), Java (>=11)
+**Prerequisites:** [Nextflow](https://www.nextflow.io/) (>=24.0), [Docker](https://www.docker.com/), Java 21 (matching CI)
 
 ### Test data (synthetic, ~2 minutes)
 
@@ -127,7 +125,10 @@ nextflow run Ekin-Kahraman/rnaseq-nextflow-pipeline \
 
 ### Report portal
 
-The optional [cloud report portal](cloud/report-portal/) registers cloud runs and returns signed S3 URLs for Nextflow reports, timelines, traces, DAGs and MultiQC output. It is a small FastAPI service backed by Postgres in production and SQLite for local testing. The root route renders a browser dashboard and `/docs` exposes the API.
+The optional [report portal](cloud/report-portal/) records run details and gives
+collaborators temporary links to reports stored in S3. It uses FastAPI, with
+Postgres in the deployment configuration and SQLite for local tests. The
+dashboard and API do not run the RNA-seq analysis.
 
 ```bash
 cd cloud/report-portal
@@ -142,13 +143,14 @@ cd cloud/report-portal
 docker compose up --build
 ```
 
-Deploy shape:
+Deployment components:
 
 ```text
 render.yaml -> Docker FastAPI service + managed Postgres + S3 presigned report links
 ```
 
-Live smoke deployment:
+Demo endpoints (availability may vary; the health check timed out during the
+7 September 2026 documentation review):
 
 - Dashboard: <https://rnaseq-report-portal.onrender.com/>
 - Health: <https://rnaseq-report-portal.onrender.com/health>
@@ -184,12 +186,12 @@ results/
 
 ## Design Decisions
 
-- **HISAT2 over STAR** - HISAT2's graph FM index fits in ~8GB RAM vs STAR's ~32GB for the human genome. Both are splice-aware aligners with comparable accuracy for well-annotated genomes; HISAT2 was chosen to keep the pipeline runnable on standard hardware.
-- **featureCounts over htseq-count** - faster on multi-sample runs (native multithreading) and produces identical counts for standard gene-level quantification.
+- **HISAT2** - a splice-aware aligner selected for a CPU-based workflow. This repository does not include a controlled accuracy or memory comparison with STAR.
+- **featureCounts** - counts reads across multiple samples using several CPU threads. Counting results depend on annotation and settings; equivalence to other tools is not assumed.
 - **BioContainers** - published containers from the Bioconda ecosystem. No custom Dockerfiles to maintain.
 - **Docker and Singularity** - `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
 - **AWS Batch profile** - `-profile awsbatch` runs the same containerised workflow on managed cloud compute with S3 work and output paths.
-- **Report portal separated from compute** - Nextflow stays responsible for execution; the FastAPI portal only stores run metadata and signs S3 artefact links, which keeps the cloud proof small and auditable.
+- **Separate report portal** - Nextflow runs the analysis; the portal records runs and provides report access.
 - **Render Blueprint** - `render.yaml` defines the web service, managed Postgres database, demo seed run and AWS secret placeholders as reviewable infrastructure-as-code.
 - **Run metadata by default** - Nextflow report, timeline, trace and DAG are emitted on every run so failures and performance can be audited after the fact.
 - **Reverse-stranded default** - `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
@@ -198,9 +200,10 @@ results/
 
 ## Limitations
 
-- **2 samples per condition in the demo** - underpowered for reliable DE. The DESeq2 step runs and produces output, but with n=2 the results are illustrative, not statistically robust. Proper analysis requires ≥3 replicates per condition.
+- **Two samples per condition in the demo** - results illustrate the workflow, not a well-powered biological comparison. Replication should be planned for the study's expected effect sizes and variability.
+- **Condition-only model** - the current DESeq2 model uses `~ condition`, even though the demo samples include paired donors. A paired study needs an appropriate donor-aware design before biological interpretation.
 - **CI uses synthetic data** - the public CI proves the full software path, not the biological conclusion. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
-- **AWS Batch proof status** - the profile and report portal are implemented, but no public real AWS Batch run artefact is committed yet. The live report portal is the current cloud proof path until a real Batch run is published.
+- **Cloud validation** - the configuration and report portal are implemented, but no real AWS Batch run record is committed. A seeded portal demonstration is not evidence of a completed cloud analysis.
 - **No STAR option** - only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
 
 ## Licence

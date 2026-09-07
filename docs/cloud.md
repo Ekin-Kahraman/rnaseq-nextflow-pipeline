@@ -2,6 +2,10 @@
 
 This pipeline can run locally with Docker or on cloud compute through Nextflow's AWS Batch executor. Keep FASTQs, references, work directories and results in the same region to avoid slow cross-region transfer and avoidable egress cost.
 
+The AWS configuration is implemented, but this repository does not yet include
+a completed real AWS Batch run record. Automated end-to-end checks use synthetic
+data with Docker; the report-portal demo uses a seeded run entry.
+
 ## AWS Batch
 
 Prerequisites:
@@ -62,7 +66,9 @@ The repository includes a minimal FastAPI report portal in `cloud/report-portal/
 - `pipeline_info/dag.dot`
 - `multiqc/multiqc_report.html`
 
-The root route renders a browser dashboard for registered runs, while `/docs` exposes the OpenAPI UI. This makes the cloud proof reviewable without needing to read raw JSON.
+The root route shows registered runs in a dashboard; `/docs` documents the API.
+The portal reports stored metadata and does not independently verify that a
+cloud analysis completed.
 
 Local smoke run:
 
@@ -81,7 +87,7 @@ cd cloud/report-portal
 docker compose up --build
 ```
 
-Production shape:
+Container deployment example:
 
 ```bash
 docker build -t rnaseq-report-portal cloud/report-portal
@@ -101,10 +107,13 @@ https://dashboard.render.com/blueprint/new?repo=https://github.com/Ekin-Kahraman
 
 Fill the AWS secret fields only when presigned S3 URLs need to work against a real result bucket. The seeded demo run is enough to show the portal and metadata layer before wiring real S3 credentials.
 
-Current live smoke deployment:
+Demo endpoints (availability may vary):
 
 - Dashboard: <https://rnaseq-report-portal.onrender.com/>
 - Health: <https://rnaseq-report-portal.onrender.com/health>
 - Seeded artefact metadata: <https://rnaseq-report-portal.onrender.com/runs/synthetic-ci-001/artifacts/report>
 
-This free Render service was created directly from the Docker portal root for fast public proof. The validated `render.yaml` remains the reproducible Postgres-backed deployment path.
+The demo health check timed out during the 7 September 2026 documentation review.
+Use the local instructions above to inspect the portal independently. The
+`render.yaml` file defines a Postgres-backed deployment configuration; its
+presence does not establish successful real-data cloud execution.
