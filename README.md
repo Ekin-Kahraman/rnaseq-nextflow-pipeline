@@ -63,7 +63,7 @@ inputs, records its execution and produces results another reviewer can inspect.
 | Area | Implementation | Useful output |
 | --- | --- | --- |
 | **Workflow integration** | Connect read QC, trimming, alignment, counting and differential expression using pinned containers. | Gene-level results and quality reports from one Nextflow command. |
-| **Input integrity** | Check sample IDs, paired-read paths, conditions and all eight HISAT2 index files. | Clear failures before expensive processing. |
+| **Input integrity** | Preserve literal sample/donor IDs, check paired reads and select exactly the requested eight HISAT2 index files. | Correct sample identities and reference selection before analysis. |
 | **Study design** | Choose condition-only or donor-adjusted DESeq2 models; check replication and complete donor pairs. | An explicit contrast with a valid model structure. |
 | **Restart handling** | Preserve real DESeq2 failures; enable Nextflow caching and overwrite run reports on reruns. | Resumable execution with the original error available for diagnosis. |
 | **Report access** | An optional FastAPI portal records runs and links to S3 reports. | A separate interface for collaborators to inspect run outputs. |
@@ -93,7 +93,7 @@ Add `-resume` to reuse completed tasks after a change, while retaining the same 
 
 ## Reproducibility
 
-All analysis steps use version-pinned BioContainers. Each run writes Nextflow execution records to `results/pipeline_info/`. CI tests input validation, the full synthetic workflow and output checks. The output validator checks sample alignment, duplicate IDs, count values and DESeq2 result fields.
+All analysis steps use version-pinned BioContainers. Each run writes Nextflow execution records to `results/pipeline_info/`. CI tests input validation, the full synthetic workflow and output checks. The full run uses distinct donors `01` and `1`, literal sample IDs including `001` and `NA`, and an unusable neighbouring index to exercise identity preservation and exact reference selection. The output validator checks sample alignment, duplicate IDs, count values and DESeq2 result fields.
 
 The optional report portal has its own tests. The portal and AWS Batch profile are not evidence of a real cloud analysis; the synthetic run is the verified execution path.
 

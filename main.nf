@@ -87,14 +87,13 @@ process HISAT2_ALIGN {
 
     input:
     tuple val(sample_id), path(fastq1), path(fastq2), val(condition)
-    path(index_files)
+    tuple val(index_prefix), path(index_files)
 
     output:
     tuple val(sample_id), path("${sample_id}.sam"), val(condition), emit: sam
     path("${sample_id}_hisat2.log"), emit: log
 
     script:
-    def index_prefix = index_files[0].toString().replaceFirst(/\.\d+\.ht2[l]?$/, '')
     """
     hisat2 \
         -x ${index_prefix} \
@@ -174,6 +173,7 @@ process DESEQ2 {
     path(counts)
     path(samplesheet)
     path(deseq_helper)
+    path(metadata_helper)
 
     output:
     path("deseq2_results.csv"), emit: results
@@ -187,6 +187,7 @@ process DESEQ2 {
     library(DESeq2)
     library(ggplot2)
     source("${deseq_helper}")
+    source("${metadata_helper}")
 
     # Read counts (skip featureCounts header, drop annotation columns)
     raw <- read.delim("${counts}", skip = 1, check.names = FALSE)
@@ -198,10 +199,7 @@ process DESEQ2 {
     colnames(counts) <- sub("\\\\.bam\$", "", basename(colnames(counts)))
 
     # Read samplesheet for condition labels
-    ss <- read.csv("${samplesheet}")
-    ss <- ss[match(colnames(counts), ss\$sample_id), ]
-    stopifnot(all(colnames(counts) == ss\$sample_id))
-    rownames(ss) <- colnames(counts)
+    ss <- read_sample_metadata("${samplesheet}", colnames(counts))
     ss\$condition <- factor(ss\$condition)
     if ("${params.design}" == "donor_condition") ss\$donor <- factor(ss\$donor)
 
@@ -316,7 +314,10 @@ workflow {
     index_ch = channel
         .fromPath("${params.genome_index}*.ht2*", checkIfExists: false)
         .collect()
-        .map { index_files -> validateHisat2IndexFiles(index_files, params.genome_index) }
+        .map { index_files ->
+            tuple(params.genome_index.tokenize('/').last(),
+                  validateHisat2IndexFiles(index_files, params.genome_index))
+        }
     HISAT2_ALIGN(FASTP.out.trimmed, index_ch)
 
     // Sort
@@ -330,7 +331,8 @@ workflow {
     // DESeq2
     samplesheet_ch = channel.fromPath(params.samplesheet, checkIfExists: true)
     deseq_helper_ch = channel.fromPath("${projectDir}/scripts/deseq2_fallback.R", checkIfExists: true)
-    DESEQ2(FEATURECOUNTS.out.counts, samplesheet_ch, deseq_helper_ch)
+    metadata_helper_ch = channel.fromPath("${projectDir}/scripts/sample_metadata.R", checkIfExists: true)
+    DESEQ2(FEATURECOUNTS.out.counts, samplesheet_ch, deseq_helper_ch, metadata_helper_ch)
 
     // MultiQC
     MULTIQC(

@@ -82,8 +82,22 @@ workflow {
     def largeIndex = (1..8).collect { part -> file("${inputRoot}/test/genome.${part}.ht2l") }
     assert validateHisat2IndexFiles(smallIndex, 'genome') == smallIndex
     assert validateHisat2IndexFiles(largeIndex, 'genome') == largeIndex
+    def neighbours = (1..8).collect { part -> file("${inputRoot}/test/genome-old.${part}.ht2") }
+    def largeNeighbours = (1..8).collect { part -> file("${inputRoot}/test/genome_other.${part}.ht2l") }
+    assert validateHisat2IndexFiles(neighbours + smallIndex.reverse(), 'genome') == smallIndex
+    assert validateHisat2IndexFiles(largeNeighbours + largeIndex.reverse(), 'genome') == largeIndex
+    assert validateHisat2IndexFiles(largeIndex + neighbours + smallIndex, 'genome') == smallIndex
+    expectFailure('incomplete') { validateHisat2IndexFiles(neighbours + smallIndex.take(7), 'genome') }
+    expectFailure('Ambiguous') { validateHisat2IndexFiles(smallIndex + smallIndex[0], 'genome') }
     expectFailure('incomplete') { validateHisat2IndexFiles(smallIndex.take(7), 'genome') }
     expectFailure('No HISAT2 index files') { validateHisat2IndexFiles([], 'genome') }
+
+    def literalRows = rows.collect { row -> row.clone() }
+    literalRows.eachWithIndex { row, i ->
+        row.sample_id = ['001', '1', 'NA', '002'][i]
+        row.donor = ['01', '1', '01', '1'][i]
+    }
+    assert validateSampleSheetRows(literalRows, 'negative', 'donor_condition') == literalRows
 
     println 'Passed input validation checks: sample sheet fields, IDs, paired donor design, read files, conditions, and both HISAT2 index formats.'
 }

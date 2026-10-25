@@ -110,7 +110,13 @@ def validateHisat2IndexFiles(indexFiles, indexPrefix) {
         throw new IllegalArgumentException("HISAT2 index '${indexPrefix}' is incomplete; expected ${prefixName}.1 through ${prefixName}.8 with a matching .ht2 or .ht2l suffix.")
     }
 
-    return indexFiles.findAll { indexFile ->
-        indexFile.fileName.toString().endsWith(".${indexExtension}")
+    return (1..8).collect { part ->
+        def matches = indexFiles.findAll { indexFile ->
+            indexFile.fileName.toString() == "${prefixName}.${part}.${indexExtension}"
+        }
+        if (matches.size() != 1) {
+            throw new IllegalArgumentException("Ambiguous HISAT2 index part '${prefixName}.${part}.${indexExtension}'.")
+        }
+        matches[0]
     }
 }
