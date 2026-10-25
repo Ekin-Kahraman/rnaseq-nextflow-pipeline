@@ -1,13 +1,13 @@
 <h1 align="center">RNA-seq Nextflow pipeline</h1>
 
 <p align="center">
-  <strong>Run paired-end RNA-seq from FASTQ reads to gene counts, DESeq2 results and quality reports.</strong>
+  <strong>Take paired-end FASTQ reads through gene counting, differential expression and quality reporting in one containerised workflow.</strong>
 </p>
 
 <p align="center">
-  A containerised Nextflow workflow designed around the airway smooth-muscle dataset from
+  Designed around the airway smooth-muscle data from
   <a href="https://doi.org/10.1371/journal.pone.0099625">Himes et al. (2014)</a>
-  (GEO <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778">GSE52778</a>).
+  (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778">GSE52778</a>).
 </p>
 
 <p align="center">
@@ -17,92 +17,53 @@
   <a href="docs/cloud.md"><img alt="AWS Batch profile" src="https://img.shields.io/badge/AWS%20Batch-profile-orange"></a>
 </p>
 
+<p align="center">
+  <a href="#workflow">Workflow</a> · <a href="#output">Output</a> · <a href="#quick-start">Quick start</a> · <a href="#reproducibility">Reproducibility</a> · <a href="#details">Details</a> · <a href="#limitations">Limitations</a>
+</p>
+
+## What this project adds
+
 <table>
   <tr>
-    <td valign="top"><strong>Input</strong></td>
-    <td>Paired-end FASTQ files, a sample sheet, a complete HISAT2 index and a GTF annotation.</td>
+    <td valign="top"><strong>Input → output</strong></td>
+    <td>Paired FASTQ reads, a sample sheet, HISAT2 index and GTF annotation become QC reports, trimmed reads, sorted BAMs, gene counts, DESeq2 results and plots.</td>
   </tr>
   <tr>
-    <td valign="top"><strong>Output</strong></td>
-    <td>Read-QC reports, trimmed reads, sorted BAMs, gene counts, DESeq2 results and plots, MultiQC, and run records.</td>
+    <td valign="top"><strong>Preflight checks</strong></td>
+    <td>Checks required columns, unique clean sample IDs, exactly two conditions with the reference present, paired reads and a complete eight-file HISAT2 index before analysis starts.</td>
   </tr>
   <tr>
-    <td valign="top"><strong>Contribution</strong></td>
-    <td>Automates quality checks, trimming, alignment, quantification and differential expression in one Nextflow workflow using pinned BioContainers.</td>
+    <td valign="top"><strong>Failure and restart handling</strong></td>
+    <td>Normal DESeq2 errors stop and report the original error message; report files are overwritten safely on reruns, and Nextflow <code>-resume</code> can reuse cached tasks.</td>
   </tr>
   <tr>
-    <td valign="top"><strong>Verification</strong></td>
-    <td>GitHub Actions runs the complete workflow on deterministic synthetic reads and checks sample IDs and outputs. The AWS Batch profile is configuration; no real cloud run is claimed.</td>
+    <td valign="top"><strong>Reproducibility</strong></td>
+    <td>Versioned BioContainers and saved trace, timeline, report and DAG; CI runs the complete synthetic workflow and validates output sample and gene IDs.</td>
+  </tr>
+  <tr>
+    <td valign="top"><strong>Optional report portal</strong></td>
+    <td>A separate FastAPI service records run metadata and serves links to reports in S3; it does not run the analysis. No real AWS Batch run is claimed.</td>
   </tr>
 </table>
 
-[Workflow](#workflow) · [Output](#output) · [Quick start](#quick-start) · [Reproducibility](#reproducibility) · [Limitations](#limitations)
-
 ## Workflow
 
-```
-FASTQ (paired-end)
-    │
-    ▼
- FastQC ──────── Raw read quality assessment
-    │
-    ▼
- fastp ────────── Adapter trimming, quality filtering
-    │
-    ▼
- HISAT2 ──────── Align to GRCh38 reference genome
-    │
-    ▼
- samtools ─────── Sort and index BAM
-    │
-    ▼
- featureCounts ── Gene-level quantification (Gencode v38)
-    │
-    ▼
- DESeq2 ──────── Differential expression + PCA + volcano plot
-    │
-    ▼
- MultiQC ─────── Aggregate QC report across all samples
-```
+`FASTQ → FastQC → fastp → HISAT2 → samtools → featureCounts → DESeq2 → MultiQC`
 
-## Processes
+## Output
 
-| Process | Tool | Container |
-|---------|------|-----------|
-| FASTQC_RAW | FastQC 0.12.1 | `quay.io/biocontainers/fastqc` |
-| FASTP | fastp 0.23.4 | `quay.io/biocontainers/fastp` |
-| HISAT2_ALIGN | HISAT2 2.2.1 | `quay.io/biocontainers/hisat2` |
-| SAMTOOLS_SORT | samtools 1.21 | `quay.io/biocontainers/samtools` |
-| FEATURECOUNTS | Subread 2.0.6 | `quay.io/biocontainers/subread` |
-| DESEQ2 | DESeq2 1.42 + ggplot2 | `quay.io/biocontainers/bioconductor-deseq2` |
-| MULTIQC | MultiQC 1.27 | `quay.io/biocontainers/multiqc` |
+| Directory | Useful outputs |
+| --- | --- |
+| `results/fastqc_raw/`, `fastp/`, `multiqc/` | Read-level QC and aggregate report |
+| `results/bam/`, `counts/` | Sorted alignments and gene count matrix |
+| `results/deseq2/` | Differential-expression CSV, volcano plot and PCA plot |
+| `results/pipeline_info/` | Nextflow report, timeline, trace and workflow DAG |
 
-All containers sourced from [BioContainers](https://biocontainers.pro/).
+## Quick start
 
-## Samples
+**Prerequisites:** [Nextflow](https://www.nextflow.io/) 24.0 or later, [Docker](https://www.docker.com/) and Java 21 (the CI runtime).
 
-| Sample | SRA | Condition | Donor |
-|--------|-----|-----------|-------|
-| N61311_untreated | SRR1039508 | untreated | N61311 |
-| N61311_Dex | SRR1039509 | dexamethasone | N61311 |
-| N052611_untreated | SRR1039512 | untreated | N052611 |
-| N052611_Dex | SRR1039513 | dexamethasone | N052611 |
-
-## Dataset and related analysis
-
-The workflow is designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625)
-airway smooth muscle dataset (dexamethasone vs untreated, GEO
-[GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This
-dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html)
-and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html).
-For the full covariate-adjusted analysis on a COVID-19 cohort, see
-[bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
-
-## Quick Start
-
-**Prerequisites:** [Nextflow](https://www.nextflow.io/) (>=24.0), [Docker](https://www.docker.com/), Java 21 (matching CI)
-
-### Test data (synthetic)
+Generate synthetic reads and run the full test profile:
 
 ```bash
 git clone https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline.git
@@ -114,32 +75,110 @@ nextflow run main.nf -profile test,docker \
 python scripts/validate_outputs.py results --samplesheet test/samplesheet.csv
 ```
 
-### Real data (airway dataset)
+The synthetic sample sheet pairs two donors across two conditions and exercises the donor-aware design. The test profile permits a logged gene-wise dispersion fallback only if standard DESeq2 fitting fails on these synthetic reads; normal runs do not use that fallback.
+
+Add `-resume` to reuse completed tasks after a change, while retaining the same Nextflow work directory.
+
+## Reproducibility
+
+All analysis steps use version-pinned BioContainers. Each run writes Nextflow execution records to `results/pipeline_info/`. CI tests input validation, the full synthetic workflow and output checks. The output validator checks sample alignment, duplicate IDs, count values and DESeq2 result fields.
+
+The optional report portal has its own tests. The portal and AWS Batch profile are not evidence of a real cloud analysis; the synthetic run is the verified execution path.
+
+## Details
+
+<details>
+<summary>Real data: Himes airway dataset</summary>
+
+The workflow is designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625) airway smooth-muscle dataset (dexamethasone vs untreated, GEO [GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html). For a covariate-adjusted analysis of a COVID-19 cohort, see [bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
+
+Download the reference files and FASTQs, then run the workflow:
 
 ```bash
-# 1. Download HISAT2 GRCh38 index (~4GB)
+# HISAT2 GRCh38 index (~4GB)
 mkdir -p genome && cd genome
 wget https://genome-idx.s3.amazonaws.com/hisat/grch38_genome.tar.gz
 tar xzf grch38_genome.tar.gz
 
-# 2. Download Gencode v38 GTF
+# Gencode v38 GTF
 wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz
 gunzip gencode.v38.annotation.gtf.gz
 cd ..
 
-# 3. Download FASTQ files from ENA (see assets/samplesheet.csv for accessions)
+# Download paired FASTQs from ENA (accessions in assets/samplesheet.csv)
 mkdir -p data
-# Example: wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/008/SRR1039508/SRR1039508_1.fastq.gz -O data/SRR1039508_1.fastq.gz
+# Example:
+# wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR103/008/SRR1039508/SRR1039508_1.fastq.gz -O data/SRR1039508_1.fastq.gz
 
-# 4. Run
 nextflow run main.nf -profile docker \
     --genome_index genome/grch38/genome \
     --gtf genome/gencode.v38.annotation.gtf
 ```
 
-### Cloud execution
+The default `assets/samplesheet.csv` contains two samples from donor N61311, so the default `--design condition` is appropriate for this small example. Use `--design donor_condition` only when at least two donors each have samples in both conditions.
 
-See [docs/cloud.md](docs/cloud.md) for AWS Batch and Seqera Platform launch notes.
+</details>
+
+<details>
+<summary>Samples and tool versions</summary>
+
+The Himes airway dataset includes these samples; the bundled two-sample CSV uses the N61311 pair:
+
+| Sample | SRA | Condition | Donor |
+| --- | --- | --- | --- |
+| N61311_untreated | SRR1039508 | untreated | N61311 |
+| N61311_Dex | SRR1039509 | dexamethasone | N61311 |
+| N052611_untreated | SRR1039512 | untreated | N052611 |
+| N052611_Dex | SRR1039513 | dexamethasone | N052611 |
+
+Each pipeline stage runs in a pinned BioContainer from [BioContainers](https://biocontainers.pro/):
+
+| Process | Tool and version | Container |
+| --- | --- | --- |
+| `FASTQC_RAW` | FastQC 0.12.1 | `quay.io/biocontainers/fastqc` |
+| `FASTP` | fastp 0.23.4 | `quay.io/biocontainers/fastp` |
+| `HISAT2_ALIGN` | HISAT2 2.2.1 | `quay.io/biocontainers/hisat2` |
+| `SAMTOOLS_SORT` | samtools 1.21 | `quay.io/biocontainers/samtools` |
+| `FEATURECOUNTS` | Subread 2.0.6 | `quay.io/biocontainers/subread` |
+| `DESEQ2` | DESeq2 1.42 and ggplot2 | `quay.io/biocontainers/bioconductor-deseq2` |
+| `MULTIQC` | MultiQC 1.27 | `quay.io/biocontainers/multiqc` |
+
+</details>
+
+<details>
+<summary>Sample sheet, parameters and design</summary>
+
+The CSV must contain `sample_id`, `fastq_1`, `fastq_2` and `condition`; `donor` is needed for `--design donor_condition`. IDs and condition labels must be free of surrounding whitespace. Sample IDs may contain letters, numbers, dots, underscores and hyphens. The workflow requires exactly two condition labels and a matching `--ref_condition`.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--samplesheet` | `assets/samplesheet.csv` | CSV sample manifest |
+| `--genome_index` | required | Prefix for all eight `.ht2` or `.ht2l` index files |
+| `--gtf` | required | Gene annotation GTF |
+| `--outdir` | `results` | Output directory |
+| `--strandedness` | `2` (reverse) | featureCounts strandedness: 0 unstranded, 1 forward, 2 reverse |
+| `--ref_condition` | `untreated` | DESeq2 reference level for the contrast |
+| `--design` | `condition` | `condition` or `donor_condition` (requires paired donor labels) |
+| `--aws_queue` | none | AWS Batch queue for `-profile awsbatch` |
+| `--aws_region` | `eu-west-2` | AWS region for `-profile awsbatch` |
+| `--aws_workdir` | none | S3 work directory for `-profile awsbatch` |
+
+`condition` uses a `~ condition` DESeq2 model. `donor_condition` uses `~ donor + condition`; validation requires at least two donors and both conditions represented for every donor. The reference level is controlled by `--ref_condition`.
+
+Other implementation choices:
+
+- **HISAT2** is the splice-aware aligner used by this CPU-based workflow; this repository has no controlled accuracy or memory comparison with STAR.
+- **featureCounts** uses `gene_name`, paired-read counting and configurable strandedness. Counts depend on the annotation and settings; equivalence with other tools is not assumed.
+- **fastp** performs adapter detection and quality filtering with Phred 20 and minimum read length 36, following the Himes analysis.
+- **Docker** is configured for local runs; **Singularity** is available for HPC environments where Docker is typically unavailable.
+- Nextflow execution reports are overwritten on reruns so a previous run does not block new run records.
+
+</details>
+
+<details>
+<summary>AWS Batch and Seqera Platform</summary>
+
+See [docs/cloud.md](docs/cloud.md) for AWS Batch and Seqera Platform launch notes. The AWS Batch profile configures managed compute with S3 work and output paths; no real AWS run record is committed.
 
 ```bash
 nextflow run Ekin-Kahraman/rnaseq-nextflow-pipeline \
@@ -153,12 +192,12 @@ nextflow run Ekin-Kahraman/rnaseq-nextflow-pipeline \
     --outdir s3://my-rnaseq-bucket/results/airway
 ```
 
-### Report portal
+</details>
 
-The optional [report portal](cloud/report-portal/) records run details and gives
-collaborators temporary links to reports stored in S3. It uses FastAPI, with
-Postgres in the deployment configuration and SQLite for local tests. The
-dashboard and API do not run the RNA-seq analysis.
+<details>
+<summary>Optional report portal</summary>
+
+The [report portal](cloud/report-portal/) records run details and gives collaborators temporary links to reports stored in S3. It uses FastAPI, with Postgres in the deployment configuration and SQLite for local tests. The dashboard and API do not run the RNA-seq analysis.
 
 ```bash
 cd cloud/report-portal
@@ -166,83 +205,24 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Run the local Postgres stack:
+Run the local Postgres stack with `docker compose up --build` from `cloud/report-portal/`. `render.yaml` defines the Docker FastAPI service, managed Postgres, demo seed run and AWS secret placeholders.
 
-```bash
-cd cloud/report-portal
-docker compose up --build
-```
-
-Deployment components:
-
-```text
-render.yaml -> Docker FastAPI service + managed Postgres + S3 presigned report links
-```
-
-Demo endpoints (availability may vary; the health check timed out during the
-7 September 2026 documentation review):
+Demo endpoints (availability may vary; the health check timed out during the 7 September 2026 documentation review):
 
 - Dashboard: <https://rnaseq-report-portal.onrender.com/>
 - Health: <https://rnaseq-report-portal.onrender.com/health>
 - Seeded artefact metadata: <https://rnaseq-report-portal.onrender.com/runs/synthetic-ci-001/artifacts/report>
 
-## Reproducibility
-
-Each analysis step runs in a version-pinned BioContainer, and Nextflow saves a
-trace, timeline, execution report and workflow DAG under `results/pipeline_info/`.
-The CI test profile enables a gene-wise dispersion fallback only for synthetic
-test reads when standard DESeq2 fitting fails; the fallback logs its reason. In
-normal runs, a DESeq2 fitting error stops the workflow with the original error.
-
-## Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--samplesheet` | `assets/samplesheet.csv` | CSV with unique sample IDs, paired FASTQ paths and exactly two condition labels |
-| `--genome_index` | required | Prefix for a complete eight-part HISAT2 `.ht2` or `.ht2l` index |
-| `--gtf` | required | Gene annotation GTF |
-| `--outdir` | `results` | Output directory |
-| `--strandedness` | `2` (reverse) | featureCounts strandedness (0/1/2) |
-| `--ref_condition` | `untreated` | DESeq2 reference level |
-| `--aws_queue` | none | AWS Batch queue for `-profile awsbatch` |
-| `--aws_region` | `eu-west-2` | AWS region for `-profile awsbatch` |
-| `--aws_workdir` | none | S3 work directory for `-profile awsbatch` |
-
-## Output
-
-```
-results/
-├── fastqc_raw/       Raw read QC reports
-├── fastp/            Trimming reports (JSON)
-├── hisat2/           Alignment logs
-├── bam/              Sorted BAM files
-├── counts/           Gene count matrix
-├── deseq2/           DE results, volcano plot, PCA plot
-├── multiqc/          Aggregated QC report
-└── pipeline_info/    Nextflow report, timeline, trace, DAG
-```
-
-## Design Decisions
-
-- **HISAT2** - a splice-aware aligner selected for a CPU-based workflow. This repository does not include a controlled accuracy or memory comparison with STAR.
-- **featureCounts** - counts reads across multiple samples using several CPU threads. Counting results depend on annotation and settings; equivalence to other tools is not assumed.
-- **BioContainers** - published containers from the Bioconda ecosystem. No custom Dockerfiles to maintain.
-- **Docker and Singularity** - `-profile docker` for local, `-profile singularity` for HPC where Docker is typically unavailable.
-- **AWS Batch profile** - `-profile awsbatch` runs the same containerised workflow on managed cloud compute with S3 work and output paths.
-- **Separate report portal** - Nextflow runs the analysis; the portal records runs and provides report access.
-- **Render Blueprint** - `render.yaml` defines the web service, managed Postgres database, demo seed run and AWS secret placeholders as reviewable infrastructure-as-code.
-- **Run metadata by default** - Nextflow report, timeline, trace and DAG are emitted on every run so failures and performance can be audited after the fact.
-- **Reverse-stranded default** - `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
-- **Configurable contrast** - `--ref_condition` sets the DESeq2 reference level. Defaults to "untreated" for the airway dataset.
-- **Test profile** - synthetic 50-gene genome with reads sampled from the reference sequence. It verifies the software path without downloading real data; synthetic-test DESeq2 fallback is explicitly enabled only in this profile.
+</details>
 
 ## Limitations
 
-- **Two samples per condition in the demo** - results illustrate the workflow, not a well-powered biological comparison. Replication should be planned for the study's expected effect sizes and variability.
-- **Condition-only model** - the current DESeq2 model uses `~ condition`, even though the demo samples include paired donors. A paired study needs an appropriate donor-aware design before biological interpretation.
-- **CI uses synthetic data** - the public CI verifies the pipeline and output checks, not a biological conclusion. Synthetic DESeq2 results may use gene-wise dispersion estimates after a logged fitting failure; this fallback is disabled for normal runs. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
-- **Cloud validation** - the configuration and report portal are implemented, but no real AWS Batch run record is committed. A seeded portal demonstration is not evidence of a completed cloud analysis.
-- **No STAR option** - only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
+- The included airway sample sheet has two samples from one donor. It is for workflow illustration, not a powered biological comparison.
+- The default design is `~ condition`. Use donor adjustment only with a valid paired study design; the synthetic CI verifies workflow execution, not biological findings.
+- CI uses deterministic synthetic reads and a synthetic 50-gene genome. Synthetic DESeq2 fitting may use the explicitly enabled gene-wise dispersion fallback after a logged failure; normal runs stop with the original fitting error.
+- Real Himes/GSE52778 runs require external FASTQs, a GRCh38 HISAT2 index and Gencode annotation.
+- No STAR option is implemented, and no controlled aligner or quantification benchmark is included.
+- The AWS Batch profile and report portal are implemented, but no real AWS Batch analysis is claimed. A seeded portal demo is not evidence of a completed cloud run.
 
 ## Licence
 

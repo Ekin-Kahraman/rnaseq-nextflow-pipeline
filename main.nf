@@ -181,6 +181,7 @@ process DESEQ2 {
     path("pca_plot.png"), emit: pca
 
     script:
+    def design_formula = params.design == 'donor_condition' ? '~ donor + condition' : '~ condition'
     """
     #!/usr/bin/env Rscript
     library(DESeq2)
@@ -200,6 +201,9 @@ process DESEQ2 {
     ss <- read.csv("${samplesheet}")
     ss <- ss[match(colnames(counts), ss\$sample_id), ]
     stopifnot(all(colnames(counts) == ss\$sample_id))
+    rownames(ss) <- colnames(counts)
+    ss\$condition <- factor(ss\$condition)
+    if ("${params.design}" == "donor_condition") ss\$donor <- factor(ss\$donor)
 
     # Filter low-count genes (adaptive: require counts in at least half the samples)
     min_count <- ifelse(max(colSums(counts)) > 1e6, 10, 1)
@@ -209,7 +213,7 @@ process DESEQ2 {
     cat(sprintf("Genes passing filter: %d (min_count=%d, min_samples=%d)\\n", sum(keep), min_count, min_samples))
 
     # DESeq2
-    dds <- DESeqDataSetFromMatrix(counts, ss, design = ~ condition)
+    dds <- DESeqDataSetFromMatrix(counts, ss, design = as.formula("${design_formula}"))
     dds\$condition <- relevel(dds\$condition, ref = "${params.ref_condition}")
 
     dds <- run_deseq_with_test_fallback(
@@ -283,6 +287,9 @@ process MULTIQC {
 workflow {
     if (!params.genome_index) { error "Provide --genome_index (HISAT2 index prefix)" }
     if (!params.gtf)          { error "Provide --gtf (gene annotation GTF)" }
+    if (!(params.design in ['condition', 'donor_condition'])) {
+        error "Unsupported --design '${params.design}'. Use condition or donor_condition."
+    }
 
     /*
      * Read samplesheet: sample_id, fastq_1, fastq_2, condition
@@ -292,7 +299,7 @@ workflow {
         .splitCsv(header: true)
         .collect()
         .map { rows ->
-            validateSampleSheetRows(rows, params.ref_condition)
+            validateSampleSheetRows(rows, params.ref_condition, params.design)
             rows.collect { row ->
                 tuple(row.sample_id.trim(), file(row.fastq_1.trim()), file(row.fastq_2.trim()), row.condition.trim())
             }

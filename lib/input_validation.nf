@@ -1,15 +1,23 @@
-def validateSampleSheetRows(rows, refCondition) {
+def validateSampleSheetRows(rows, refCondition, design = 'condition') {
     if (!rows) {
         throw new IllegalArgumentException('The sample sheet contains no data rows.')
     }
 
+    if (!(design in ['condition', 'donor_condition'])) {
+        throw new IllegalArgumentException("Unsupported DESeq2 design '${design}'. Use 'condition' or 'donor_condition'.")
+    }
+
     def requiredColumns = ['sample_id', 'fastq_1', 'fastq_2', 'condition']
+    if (design == 'donor_condition') requiredColumns << 'donor'
     def missingColumns = requiredColumns.findAll { column -> !(column in rows[0].keySet()) }
     if (missingColumns) {
         throw new IllegalArgumentException("Sample sheet is missing required columns: ${missingColumns.join(', ')}")
     }
 
     def sampleIds = rows.collect { row -> row.sample_id?.trim() }
+    if (rows.any { row -> row.sample_id != row.sample_id?.trim() }) {
+        throw new IllegalArgumentException('Sample IDs must not have leading or trailing whitespace.')
+    }
     if (sampleIds.any { sampleId -> !sampleId }) {
         throw new IllegalArgumentException('Sample IDs must not be empty.')
     }
@@ -21,6 +29,9 @@ def validateSampleSheetRows(rows, refCondition) {
     }
 
     def conditions = rows.collect { row -> row.condition?.trim() }
+    if (rows.any { row -> row.condition != row.condition?.trim() }) {
+        throw new IllegalArgumentException('Condition labels must not have leading or trailing whitespace.')
+    }
     if (conditions.any { condition -> !condition }) {
         throw new IllegalArgumentException('Condition labels must not be empty.')
     }
@@ -30,6 +41,25 @@ def validateSampleSheetRows(rows, refCondition) {
     }
     if (!refCondition || !(refCondition in conditionLevels)) {
         throw new IllegalArgumentException("Reference condition '${refCondition}' is not present in the sample sheet: ${conditionLevels.join(', ')}.")
+    }
+
+    if (design == 'donor_condition') {
+        def donors = rows.collect { row -> row.donor?.trim() }
+        if (rows.any { row -> row.donor != row.donor?.trim() }) {
+            throw new IllegalArgumentException('Donor labels must not have leading or trailing whitespace.')
+        }
+        if (donors.any { donor -> !donor }) {
+            throw new IllegalArgumentException('Donor labels must not be empty for the donor_condition design.')
+        }
+        if (donors.toSet().size() < 2) {
+            throw new IllegalArgumentException('The donor_condition design requires at least two donors.')
+        }
+        def conditionsByDonor = [:].withDefault { [] as Set }
+        rows.eachWithIndex { _row, index -> conditionsByDonor[donors[index]] << conditions[index] }
+        def unpairedDonors = conditionsByDonor.findAll { _donor, labels -> labels != conditionLevels }.keySet()
+        if (unpairedDonors) {
+            throw new IllegalArgumentException("Every donor must have samples in both conditions for the donor_condition design; incomplete donors: ${unpairedDonors.join(', ')}.")
+        }
     }
 
     rows.eachWithIndex { row, index ->

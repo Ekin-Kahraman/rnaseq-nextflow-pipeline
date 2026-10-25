@@ -100,15 +100,16 @@ def write_samplesheet(samples, outdir):
     """Write test samplesheet."""
     path = os.path.join(outdir, "samplesheet.csv")
     with open(path, "w") as f:
-        f.write("sample_id,fastq_1,fastq_2,condition\n")
-        for sample_id, condition in samples:
+        f.write("sample_id,fastq_1,fastq_2,condition,donor\n")
+        for sample_id, condition, donor in samples:
             fastq_1 = Path(outdir, f"{sample_id}_1.fastq.gz").relative_to(PROJECT_DIR)
             fastq_2 = Path(outdir, f"{sample_id}_2.fastq.gz").relative_to(PROJECT_DIR)
             f.write(
                 f"{sample_id},"
                 f"{fastq_1},"
                 f"{fastq_2},"
-                f"{condition}\n"
+                f"{condition},"
+                f"{donor}\n"
             )
     print(f"  Samplesheet: {len(samples)} samples")
 
@@ -130,10 +131,10 @@ def main():
     print("Generating test data...")
 
     samples = [
-        ("test_pos1", "positive"),
-        ("test_pos2", "positive"),
-        ("test_neg1", "negative"),
-        ("test_neg2", "negative"),
+        ("test_pos1", "positive", "donor_1"),
+        ("test_pos2", "positive", "donor_2"),
+        ("test_neg1", "negative", "donor_1"),
+        ("test_neg2", "negative", "donor_2"),
     ]
 
     genome_path = write_genome(TEST_DIR)
@@ -142,7 +143,7 @@ def main():
     with open(genome_path) as f:
         genome_seq = "".join(line.strip() for line in f if not line.startswith(">"))
 
-    for sample_id, _ in samples:
+    for sample_id, _, _ in samples:
         write_fastq_pair(sample_id, N_READS, TEST_DIR, genome_seq)
     write_gtf(TEST_DIR)
     write_samplesheet(samples, TEST_DIR)
