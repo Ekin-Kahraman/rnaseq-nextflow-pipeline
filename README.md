@@ -102,7 +102,7 @@ For the full covariate-adjusted analysis on a COVID-19 cohort, see
 
 **Prerequisites:** [Nextflow](https://www.nextflow.io/) (>=24.0), [Docker](https://www.docker.com/), Java 21 (matching CI)
 
-### Test data (synthetic, ~2 minutes)
+### Test data (synthetic)
 
 ```bash
 git clone https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline.git
