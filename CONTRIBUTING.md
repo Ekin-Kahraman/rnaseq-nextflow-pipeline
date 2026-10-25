@@ -9,7 +9,7 @@ git clone https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline.git
 cd rnaseq-nextflow-pipeline
 python test/create_test_data.py
 nextflow run main.nf -profile test,docker --outdir test_results
-python scripts/validate_outputs.py test_results
+python scripts/validate_outputs.py test_results --samplesheet test/samplesheet.csv
 ```
 
 Use `-profile test` for pull requests. It builds a tiny synthetic reference and verifies the full software path without downloading controlled or patient-derived data.

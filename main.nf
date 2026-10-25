@@ -2,6 +2,8 @@
 
 nextflow.enable.dsl = 2
 
+include { validateSampleSheetRows; validateHisat2IndexFiles } from './lib/input_validation'
+
 /*
  * Bulk RNA-seq Pipeline
  * FASTQ → FastQC → fastp → HISAT2 → samtools → featureCounts → DESeq2 → MultiQC
@@ -171,6 +173,7 @@ process DESEQ2 {
     input:
     path(counts)
     path(samplesheet)
+    path(deseq_helper)
 
     output:
     path("deseq2_results.csv"), emit: results
@@ -182,6 +185,7 @@ process DESEQ2 {
     #!/usr/bin/env Rscript
     library(DESeq2)
     library(ggplot2)
+    source("${deseq_helper}")
 
     # Read counts (skip featureCounts header, drop annotation columns)
     raw <- read.delim("${counts}", skip = 1, check.names = FALSE)
@@ -208,16 +212,10 @@ process DESEQ2 {
     dds <- DESeqDataSetFromMatrix(counts, ss, design = ~ condition)
     dds\$condition <- relevel(dds\$condition, ref = "${params.ref_condition}")
 
-    tryCatch({
-        dds <- DESeq(dds)
-    }, error = function(e) {
-        # Fallback for small/test datasets where dispersion fitting fails
-        cat("Note: using gene-wise dispersion estimates (expected for small test data)\\n")
-        dds <<- estimateSizeFactors(dds, type = "poscounts")
-        dds <<- estimateDispersionsGeneEst(dds)
-        dispersions(dds) <<- mcols(dds)\$dispGeneEst
-        dds <<- nbinomWaldTest(dds)
-    })
+    dds <- run_deseq_with_test_fallback(
+        dds,
+        allow_test_fallback = ${params.allow_test_deseq_fallback.toString().toUpperCase()}
+    )
     # Get the non-reference condition level for contrast
     cond_levels <- levels(dds\$condition)
     treat_level <- cond_levels[cond_levels != "${params.ref_condition}"][1]
@@ -289,10 +287,17 @@ workflow {
     /*
      * Read samplesheet: sample_id, fastq_1, fastq_2, condition
      */
-    reads_ch = Channel
-        .fromPath(params.samplesheet)
+    reads_ch = channel
+        .fromPath(params.samplesheet, checkIfExists: true)
         .splitCsv(header: true)
-        .map { row -> tuple(row.sample_id, file(row.fastq_1), file(row.fastq_2), row.condition) }
+        .collect()
+        .map { rows ->
+            validateSampleSheetRows(rows, params.ref_condition)
+            rows.collect { row ->
+                tuple(row.sample_id.trim(), file(row.fastq_1.trim()), file(row.fastq_2.trim()), row.condition.trim())
+            }
+        }
+        .flatMap { rows -> rows }
 
     // Raw QC
     FASTQC_RAW(reads_ch)
@@ -301,20 +306,24 @@ workflow {
     FASTP(reads_ch)
 
     // Align
-    index_ch = Channel.fromPath("${params.genome_index}*.ht2").collect()
+    index_ch = channel
+        .fromPath("${params.genome_index}*.ht2*", checkIfExists: false)
+        .collect()
+        .map { index_files -> validateHisat2IndexFiles(index_files, params.genome_index) }
     HISAT2_ALIGN(FASTP.out.trimmed, index_ch)
 
     // Sort
     SAMTOOLS_SORT(HISAT2_ALIGN.out.sam)
 
     // Count — collect all BAMs
-    all_bams = SAMTOOLS_SORT.out.bam.map { id, bam, bai, cond -> bam }.collect()
-    gtf_ch = Channel.fromPath(params.gtf)
+    all_bams = SAMTOOLS_SORT.out.bam.map { _id, bam, _bai, _cond -> bam }.collect()
+    gtf_ch = channel.fromPath(params.gtf, checkIfExists: true)
     FEATURECOUNTS(all_bams, gtf_ch)
 
     // DESeq2
-    samplesheet_ch = Channel.fromPath(params.samplesheet)
-    DESEQ2(FEATURECOUNTS.out.counts, samplesheet_ch)
+    samplesheet_ch = channel.fromPath(params.samplesheet, checkIfExists: true)
+    deseq_helper_ch = channel.fromPath("${projectDir}/scripts/deseq2_fallback.R", checkIfExists: true)
+    DESEQ2(FEATURECOUNTS.out.counts, samplesheet_ch, deseq_helper_ch)
 
     // MultiQC
     MULTIQC(

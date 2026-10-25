@@ -1,22 +1,42 @@
-# RNA-seq Nextflow Pipeline
+<h1 align="center">RNA-seq Nextflow pipeline</h1>
 
-[![CI](https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Nextflow](https://img.shields.io/badge/Nextflow-%E2%89%A524.0-brightgreen)](https://www.nextflow.io/)
-[![AWS Batch](https://img.shields.io/badge/AWS%20Batch-profile-orange)](docs/cloud.md)
+<p align="center">
+  <strong>Run paired-end RNA-seq from FASTQ reads to gene counts, DESeq2 results and quality reports.</strong>
+</p>
 
-A reproducible RNA-seq workflow from raw sequencing reads to gene counts,
-differential expression and quality reports. Nextflow coordinates the steps;
-Docker or Singularity supplies their software environments.
+<p align="center">
+  A containerised Nextflow workflow designed around the airway smooth-muscle dataset from
+  <a href="https://doi.org/10.1371/journal.pone.0099625">Himes et al. (2014)</a>
+  (GEO <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778">GSE52778</a>).
+</p>
 
-Designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625) airway smooth muscle dataset (dexamethasone vs untreated, GEO [GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html). For the full covariate-adjusted analysis on a COVID-19 cohort, see [bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
+<p align="center">
+  <a href="https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <a href="https://www.nextflow.io/"><img alt="Nextflow 24.0 or later" src="https://img.shields.io/badge/Nextflow-%E2%89%A524.0-brightgreen"></a>
+  <a href="docs/cloud.md"><img alt="AWS Batch profile" src="https://img.shields.io/badge/AWS%20Batch-profile-orange"></a>
+</p>
 
-## Validation and reproducibility
+<table>
+  <tr>
+    <td valign="top"><strong>Input</strong></td>
+    <td>Paired-end FASTQ files, a sample sheet, a complete HISAT2 index and a GTF annotation.</td>
+  </tr>
+  <tr>
+    <td valign="top"><strong>Output</strong></td>
+    <td>Read-QC reports, trimmed reads, sorted BAMs, gene counts, DESeq2 results and plots, MultiQC, and run records.</td>
+  </tr>
+  <tr>
+    <td valign="top"><strong>Contribution</strong></td>
+    <td>Automates quality checks, trimming, alignment, quantification and differential expression in one Nextflow workflow using pinned BioContainers.</td>
+  </tr>
+  <tr>
+    <td valign="top"><strong>Verification</strong></td>
+    <td>GitHub Actions runs the complete workflow on deterministic synthetic reads and checks sample IDs and outputs. The AWS Batch profile is configuration; no real cloud run is claimed.</td>
+  </tr>
+</table>
 
-- Automated tests run the complete workflow on synthetic reads and check the count matrix, expression results, reports and run records.
-- Versioned analysis containers and saved run reports make the workflow easier to reproduce and diagnose.
-- Local/HPC profiles and AWS Batch configuration are included. No completed real AWS Batch analysis is claimed.
-- An optional report portal provides a dashboard for registered runs and stored reports; it is separate from the analysis itself.
+[Workflow](#workflow) · [Output](#output) · [Quick start](#quick-start) · [Reproducibility](#reproducibility) · [Limitations](#limitations)
 
 ## Workflow
 
@@ -68,6 +88,16 @@ All containers sourced from [BioContainers](https://biocontainers.pro/).
 | N052611_untreated | SRR1039512 | untreated | N052611 |
 | N052611_Dex | SRR1039513 | dexamethasone | N052611 |
 
+## Dataset and related analysis
+
+The workflow is designed around the [Himes et al. (2014)](https://doi.org/10.1371/journal.pone.0099625)
+airway smooth muscle dataset (dexamethasone vs untreated, GEO
+[GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)). This
+dataset is used in the [DESeq2 vignette](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html)
+and the [Bioconductor RNA-seq workflow](https://www.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html).
+For the full covariate-adjusted analysis on a COVID-19 cohort, see
+[bulk-rnaseq-differential-expression](https://github.com/Ekin-Kahraman/bulk-rnaseq-differential-expression).
+
 ## Quick Start
 
 **Prerequisites:** [Nextflow](https://www.nextflow.io/) (>=24.0), [Docker](https://www.docker.com/), Java 21 (matching CI)
@@ -81,7 +111,7 @@ python test/create_test_data.py
 nextflow run main.nf -profile test,docker \
     --genome_index "$(pwd)/test/genome" \
     --gtf "$(pwd)/test/genes.gtf"
-python scripts/validate_outputs.py results
+python scripts/validate_outputs.py results --samplesheet test/samplesheet.csv
 ```
 
 ### Real data (airway dataset)
@@ -156,12 +186,20 @@ Demo endpoints (availability may vary; the health check timed out during the
 - Health: <https://rnaseq-report-portal.onrender.com/health>
 - Seeded artefact metadata: <https://rnaseq-report-portal.onrender.com/runs/synthetic-ci-001/artifacts/report>
 
+## Reproducibility
+
+Each analysis step runs in a version-pinned BioContainer, and Nextflow saves a
+trace, timeline, execution report and workflow DAG under `results/pipeline_info/`.
+The CI test profile enables a gene-wise dispersion fallback only for synthetic
+test reads when standard DESeq2 fitting fails; the fallback logs its reason. In
+normal runs, a DESeq2 fitting error stops the workflow with the original error.
+
 ## Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--samplesheet` | `assets/samplesheet.csv` | CSV: sample_id, fastq_1, fastq_2, condition |
-| `--genome_index` | required | HISAT2 index prefix |
+| `--samplesheet` | `assets/samplesheet.csv` | CSV with unique sample IDs, paired FASTQ paths and exactly two condition labels |
+| `--genome_index` | required | Prefix for a complete eight-part HISAT2 `.ht2` or `.ht2l` index |
 | `--gtf` | required | Gene annotation GTF |
 | `--outdir` | `results` | Output directory |
 | `--strandedness` | `2` (reverse) | featureCounts strandedness (0/1/2) |
@@ -196,13 +234,13 @@ results/
 - **Run metadata by default** - Nextflow report, timeline, trace and DAG are emitted on every run so failures and performance can be audited after the fact.
 - **Reverse-stranded default** - `--strandedness 2` because the airway dataset (and most modern Illumina dUTP protocols) produces reverse-stranded libraries. Users with older unstranded preps should set `--strandedness 0`.
 - **Configurable contrast** - `--ref_condition` sets the DESeq2 reference level. Defaults to "untreated" for the airway dataset.
-- **Test profile** - synthetic 50-gene genome with reads sampled from the reference sequence. Verifies the full pipeline in ~2 minutes without downloading real data.
+- **Test profile** - synthetic 50-gene genome with reads sampled from the reference sequence. It verifies the software path without downloading real data; synthetic-test DESeq2 fallback is explicitly enabled only in this profile.
 
 ## Limitations
 
 - **Two samples per condition in the demo** - results illustrate the workflow, not a well-powered biological comparison. Replication should be planned for the study's expected effect sizes and variability.
 - **Condition-only model** - the current DESeq2 model uses `~ condition`, even though the demo samples include paired donors. A paired study needs an appropriate donor-aware design before biological interpretation.
-- **CI uses synthetic data** - the public CI proves the full software path, not the biological conclusion. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
+- **CI uses synthetic data** - the public CI verifies the pipeline and output checks, not a biological conclusion. Synthetic DESeq2 results may use gene-wise dispersion estimates after a logged fitting failure; this fallback is disabled for normal runs. Real Himes/GSE52778 runs require external FASTQs, GRCh38 HISAT2 index and Gencode annotation files.
 - **Cloud validation** - the configuration and report portal are implemented, but no real AWS Batch run record is committed. A seeded portal demonstration is not evidence of a completed cloud analysis.
 - **No STAR option** - only HISAT2 is implemented. Adding STAR as an alternative aligner would allow benchmarking on the same data.
 

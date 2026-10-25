@@ -38,6 +38,18 @@ jobs:
             quay.io/biocontainers/hisat2:2.2.1--hdbdd923_6 \
             hisat2-build -q /data/genome.fa /data/genome
 
+      - name: Verify production DESeq failures do not fall back
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/data" -w /data \
+            quay.io/biocontainers/bioconductor-deseq2:1.42.0--r43hf17093f_2 \
+            Rscript test/test_deseq2_fallback.R
+
+      - name: Test input validation
+        run: nextflow run test/test_input_validation.nf
+
+      - name: Test output validation
+        run: python -m unittest discover -s test -p 'test_validate_outputs.py' -v
+
       - name: Run pipeline (test profile)
         run: |
           nextflow run main.nf \
@@ -46,7 +58,7 @@ jobs:
             --gtf "$GITHUB_WORKSPACE/test/genes.gtf"
 
       - name: Verify outputs
-        run: python scripts/validate_outputs.py results
+        run: python scripts/validate_outputs.py results --samplesheet test/samplesheet.csv
 
       - name: Test report portal
         run: |
