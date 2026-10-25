@@ -1,3 +1,5 @@
 sample_id,fastq_1,fastq_2,condition,donor
 SRR1039508,data/SRR1039508_1.fastq.gz,data/SRR1039508_2.fastq.gz,untreated,N61311
 SRR1039509,data/SRR1039509_1.fastq.gz,data/SRR1039509_2.fastq.gz,dexamethasone,N61311
+SRR1039512,data/SRR1039512_1.fastq.gz,data/SRR1039512_2.fastq.gz,untreated,N052611
+SRR1039513,data/SRR1039513_1.fastq.gz,data/SRR1039513_2.fastq.gz,dexamethasone,N052611

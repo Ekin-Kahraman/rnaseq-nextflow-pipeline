@@ -25,6 +25,10 @@ workflow {
     assert validateSampleSheetRows(rows, 'negative').size() == 4
     assert validateSampleSheetRows(rows, 'negative', 'donor_condition').size() == 4
     expectFailure('Unsupported DESeq2 design') { validateSampleSheetRows(rows, 'negative', 'arbitrary_formula') }
+    expectFailure('no residual degrees of freedom') {
+        validateSampleSheetRows([rows[0], rows[2]], 'negative', 'condition')
+    }
+    assert validateSampleSheetRows(rows.take(3), 'negative', 'condition').size() == 3
     expectFailure('unique') { validateSampleSheetRows(rows + rows[0], 'negative') }
     expectFailure('Exactly two condition labels') { validateSampleSheetRows(rows + [[sample_id: 'other', fastq_1: rows[0].fastq_1, fastq_2: rows[0].fastq_2, condition: 'other']], 'negative') }
     expectFailure('not present') { validateSampleSheetRows(rows, 'missing') }
@@ -65,7 +69,7 @@ workflow {
     }
     expectFailure('Every donor must have samples in both conditions') {
         def unpairedRows = rows.collect { row -> row.clone() }
-        unpairedRows[0].donor = 'donor_3'
+        unpairedRows[0].donor = 'donor_2'
         validateSampleSheetRows(unpairedRows, 'negative', 'donor_condition')
     }
     expectFailure('Donor labels must not have leading or trailing whitespace') {

@@ -43,6 +43,21 @@ def validateSampleSheetRows(rows, refCondition, design = 'condition') {
         throw new IllegalArgumentException("Reference condition '${refCondition}' is not present in the sample sheet: ${conditionLevels.join(', ')}.")
     }
 
+    def samplesPerCondition = conditions.countBy { condition -> condition }
+    def modelParameterCount = conditionLevels.size()
+    if (design == 'donor_condition') {
+        def donorCount = rows.collect { row -> row.donor?.trim() }.toSet().size()
+        modelParameterCount = donorCount + 1
+    }
+    def residualDegreesOfFreedom = rows.size() - modelParameterCount
+    if (residualDegreesOfFreedom < 1) {
+        throw new IllegalArgumentException("The DESeq2 design '${design}' has no residual degrees of freedom (${rows.size()} samples, ${modelParameterCount} model parameters). Add biological replicates before analysis.")
+    }
+    def underReplicatedConditions = samplesPerCondition.findAll { _condition, count -> count < 2 }.keySet()
+    if (underReplicatedConditions) {
+        System.err.println("WARNING: Fewer than two samples are available for condition(s) ${underReplicatedConditions.join(', ')}. Replication is recommended for reliable dispersion estimation.")
+    }
+
     if (design == 'donor_condition') {
         def donors = rows.collect { row -> row.donor?.trim() }
         if (rows.any { row -> row.donor != row.donor?.trim() }) {
