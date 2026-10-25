@@ -1,50 +1,46 @@
 <h1 align="center">RNA-seq Nextflow pipeline</h1>
 
 <p align="center">
-  <strong>Take paired-end FASTQ reads through gene counting, differential expression and quality reporting in one containerised workflow.</strong>
+  <strong>From raw RNA-seq reads to gene-level results.<br>
+  One reproducible workflow.</strong>
 </p>
 
 <p align="center">
-  Designed around the airway smooth-muscle data from
+  A containerised Nextflow pipeline, with a paired-study example from
   <a href="https://doi.org/10.1371/journal.pone.0099625">Himes et al. (2014)</a>
-  (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778">GSE52778</a>).
+  and a complete synthetic test dataset.
 </p>
 
 <p align="center">
   <a href="https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Ekin-Kahraman/rnaseq-nextflow-pipeline/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://www.nextflow.io/"><img alt="Nextflow" src="https://img.shields.io/badge/Nextflow-containers-0DC09D"></a>
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
-  <a href="https://www.nextflow.io/"><img alt="Nextflow 24.0 or later" src="https://img.shields.io/badge/Nextflow-%E2%89%A524.0-brightgreen"></a>
-  <a href="docs/cloud.md"><img alt="AWS Batch profile" src="https://img.shields.io/badge/AWS%20Batch-profile-orange"></a>
 </p>
-
-<p align="center">
-  <a href="#workflow">Workflow</a> · <a href="#output">Output</a> · <a href="#quick-start">Quick start</a> · <a href="#reproducibility">Reproducibility</a> · <a href="#details">Details</a> · <a href="#limitations">Limitations</a>
-</p>
-
-## What this project adds
 
 <table>
   <tr>
-    <td valign="top"><strong>Input → output</strong></td>
-    <td>Paired FASTQ reads, a sample sheet, HISAT2 index and GTF annotation become QC reports, trimmed reads, sorted BAMs, gene counts, DESeq2 results and plots.</td>
+    <td valign="top">Output</td>
+    <td><strong>Paired reads → gene counts, differential expression and QC reports</strong><br>
+      Seven tools connected in one workflow, with aligned sample labels and a record of every run.</td>
   </tr>
   <tr>
-    <td valign="top"><strong>Preflight checks</strong></td>
-    <td>Checks required columns, unique clean sample IDs, exactly two conditions with the reference present, paired reads and a complete eight-file HISAT2 index before analysis starts.</td>
+    <td valign="top">Engineering</td>
+    <td><strong>Checked inputs. Explicit study designs. Resumable execution.</strong><br>
+      Validate samples and references before analysis; choose a condition-only or donor-adjusted model; reuse completed tasks with Nextflow.</td>
   </tr>
   <tr>
-    <td valign="top"><strong>Failure and restart handling</strong></td>
-    <td>Normal DESeq2 errors stop and report the original error message; report files are overwritten safely on reruns, and Nextflow <code>-resume</code> can reuse cached tasks.</td>
-  </tr>
-  <tr>
-    <td valign="top"><strong>Reproducibility</strong></td>
-    <td>Versioned BioContainers and saved trace, timeline, report and DAG; CI runs the complete synthetic workflow and validates output sample and gene IDs.</td>
-  </tr>
-  <tr>
-    <td valign="top"><strong>Optional report portal</strong></td>
-    <td>A separate FastAPI service records run metadata and serves links to reports in S3; it does not run the analysis. No real AWS Batch run is claimed.</td>
+    <td valign="top">Verification</td>
+    <td><strong>The complete synthetic workflow runs in CI</strong><br>
+      Automated input, output and failure-path checks. Both statistical designs have been exercised locally; the optional report portal is tested separately.</td>
   </tr>
 </table>
+
+<p align="center">
+  <a href="#workflow">Workflow</a> ·
+  <a href="#what-this-project-adds">Contribution</a> ·
+  <a href="#quick-start">Run the pipeline</a> ·
+  <a href="#reproducibility">Verification</a>
+</p>
 
 ## Workflow
 
@@ -58,6 +54,22 @@
 | `results/bam/`, `counts/` | Sorted alignments and gene count matrix |
 | `results/deseq2/` | Differential-expression CSV, volcano plot and PCA plot |
 | `results/pipeline_info/` | Nextflow report, timeline, trace and workflow DAG |
+
+## What this project adds
+
+This project connects established analysis tools into a workflow that checks its
+inputs, records its execution and produces results another reviewer can inspect.
+
+| Area | Implementation | Useful output |
+| --- | --- | --- |
+| **Workflow integration** | Connect read QC, trimming, alignment, counting and differential expression using pinned containers. | Gene-level results and quality reports from one Nextflow command. |
+| **Input integrity** | Check sample IDs, paired-read paths, conditions and all eight HISAT2 index files. | Clear failures before expensive processing. |
+| **Study design** | Choose condition-only or donor-adjusted DESeq2 models; check replication and complete donor pairs. | An explicit contrast with a valid model structure. |
+| **Restart handling** | Preserve real DESeq2 failures; enable Nextflow caching and overwrite run reports on reruns. | Resumable execution with the original error available for diagnosis. |
+| **Report access** | An optional FastAPI portal records runs and links to S3 reports. | A separate interface for collaborators to inspect run outputs. |
+
+[Workflow code](main.nf) · [Input checks](lib/input_validation.nf) ·
+[Output checks](scripts/validate_outputs.py) · [Report portal](cloud/report-portal/)
 
 ## Quick start
 
