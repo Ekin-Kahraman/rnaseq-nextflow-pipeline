@@ -5,6 +5,7 @@ Creates tiny FASTQ files, a minimal genome, and a gene annotation that
 are just large enough for each pipeline step to run without error.
 """
 
+from contextlib import ExitStack
 import gzip
 import io
 import random
@@ -31,36 +32,34 @@ def random_seq(length):
 
 
 def write_fastq_pair(sample_id, n_reads, outdir, genome_seq):
-    """Write paired FASTQ files with reads sampled from the genome."""
-    max_start = len(genome_seq) - READ_LEN * 2 - 200
-    if max_start < 0:
-        max_start = 0
-    for read_num in [1, 2]:
-        path = os.path.join(outdir, f"{sample_id}_{read_num}.fastq.gz")
-        with open(path, "wb") as raw:
-            gzip_name = os.path.basename(path)
-            if gzip_name.endswith(".gz"):
-                gzip_name = gzip_name[:-3]
-            with gzip.GzipFile(filename=gzip_name, mode="wb", fileobj=raw, mtime=0) as gz:
-                with io.TextIOWrapper(gz, encoding="utf-8", newline="") as f:
-                    for i in range(n_reads):
-                        # Sample a position from the genome
-                        start = random.randint(0, max_start)
-                        if read_num == 1:
-                            seq = genome_seq[start : start + READ_LEN]
-                        else:
-                            # Mate reads from ~200bp downstream
-                            mate_start = start + READ_LEN + random.randint(50, 200)
-                            mate_start = min(mate_start, len(genome_seq) - READ_LEN)
-                            seq = genome_seq[mate_start : mate_start + READ_LEN]
-                            # Reverse complement for paired-end
-                            comp = str.maketrans("ACGT", "TGCA")
-                            seq = seq.translate(comp)[::-1]
-                        f.write(f"@{sample_id}.{i}/R{read_num}\n")
-                        f.write(seq + "\n")
-                        f.write("+\n")
-                        f.write(QUAL + "\n")
-    print(f"  {sample_id}: {n_reads} read pairs (sampled from genome)")
+    """Write inward-facing mates from the same 250-400 bp reference fragment."""
+    min_fragment = READ_LEN * 2 + 50
+    max_fragment = READ_LEN * 2 + 200
+    if len(genome_seq) < max_fragment:
+        raise ValueError(f"Synthetic genome must be at least {max_fragment} bp long.")
+    complement = str.maketrans("ACGT", "TGCA")
+
+    with ExitStack() as stack:
+        mates = []
+        for read_num in [1, 2]:
+            path = os.path.join(outdir, f"{sample_id}_{read_num}.fastq.gz")
+            raw = stack.enter_context(open(path, "wb"))
+            gz = gzip.GzipFile(
+                filename=os.path.basename(path).removesuffix(".gz"),
+                mode="wb", fileobj=raw, mtime=0,
+            )
+            mates.append(stack.enter_context(io.TextIOWrapper(gz, encoding="utf-8", newline="")))
+
+        for i in range(n_reads):
+            fragment_length = random.randint(min_fragment, max_fragment)
+            start = random.randint(0, len(genome_seq) - fragment_length)
+            # Both mates come from one fragment; R2 faces back towards R1.
+            r1 = genome_seq[start : start + READ_LEN]
+            mate_start = start + fragment_length - READ_LEN
+            r2 = genome_seq[mate_start : mate_start + READ_LEN].translate(complement)[::-1]
+            for read_num, (handle, seq) in enumerate(zip(mates, [r1, r2]), start=1):
+                handle.write(f"@{sample_id}.{i}/R{read_num}\n{seq}\n+\n{QUAL}\n")
+    print(f"  {sample_id}: {n_reads} read pairs (sampled from shared reference fragments)")
 
 
 def write_genome(outdir):

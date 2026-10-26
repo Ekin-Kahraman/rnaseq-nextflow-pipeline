@@ -93,7 +93,7 @@ Add `-resume` to reuse completed tasks after a change, while retaining the same 
 
 ## Reproducibility
 
-All analysis steps use version-pinned BioContainers. Each run writes Nextflow execution records to `results/pipeline_info/`. CI tests input validation, the full synthetic workflow and output checks. The full run uses distinct donors `01` and `1`, literal sample IDs including `001` and `NA`, and an unusable neighbouring index to exercise identity preservation and exact reference selection. The output validator checks sample alignment, duplicate IDs, count values and DESeq2 result fields.
+All analysis steps use version-pinned BioContainers. Each run writes Nextflow execution records to `results/pipeline_info/`. CI verifies that synthetic mates share a 250-400 bp reference fragment, then tests input validation, the full synthetic workflow and output checks. The full run uses distinct donors `01` and `1`, literal sample IDs including `001` and `NA`, and an unusable neighbouring index to exercise identity preservation and exact reference selection. The output validator checks sample alignment, duplicate IDs, count values and DESeq2 result fields.
 
 The optional report portal has its own tests. The portal and AWS Batch profile are not evidence of a real cloud analysis; the synthetic run is the verified execution path.
 
