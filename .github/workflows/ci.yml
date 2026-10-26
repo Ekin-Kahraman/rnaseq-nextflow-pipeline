@@ -26,6 +26,9 @@ jobs:
           curl -s https://get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/
 
+      - name: Test synthetic paired-end read generation
+        run: python -m unittest discover -s test -p 'test_create_test_data.py' -v
+
       - name: Generate test data
         run: python test/create_test_data.py
 
